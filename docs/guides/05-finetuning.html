@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fine-tuning · SLM Decision Models</title>
+<meta name="description" content="LoRA, QLoRA and full tuning for decision tasks: what to freeze, what to learn, and the hyperparameters that matter.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item active" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Guides / Fine-tuning</div>
+  <h1>Fine-tuning</h1>
+  <p class="subtitle">LoRA, QLoRA and full tuning for decision tasks: what to freeze, what to learn, and the hyperparameters that matter.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Distillation copies behaviour; fine-tuning shapes it toward your objective — your label taxonomy, your cost
+asymmetry, your abstain class. In practice you do both: distil for breadth, fine-tune on the gold-labelled slice.</p>
+
+<h2>Choosing the method</h2>
+<table>
+<thead><tr><th>Method</th><th>Trainable params</th><th>GPU memory (360M model)</th><th>Use when</th></tr></thead>
+<tbody>
+<tr><td>Linear probe (frozen encoder)</td><td>~0.05%</td><td>&lt; 1 GB</td><td>≤ 20 classes, ≥ 500 labels — start here</td></tr>
+<tr><td>LoRA (r = 8–16)</td><td>0.1%–1%</td><td>2–6 GB</td><td>Default for decoder SLMs and larger label sets</td></tr>
+<tr><td>QLoRA (4-bit base + LoRA)</td><td>0.1%–1%</td><td>1.5–3 GB for a 3B model</td><td>Consumer GPU, or when you must hold many adapters</td></tr>
+<tr><td>Full fine-tune</td><td>100%</td><td>8–20 GB</td><td>Large domain shift, ≥ 50k labels, and you own the training rig</td></tr>
+</tbody>
+</table>
+<p>LoRA's original result (Hu et al., 2021) was that adapters with rank 8–64 on the attention projections cut
+trainable parameters by ~10,000× and GPU memory by ~3× versus full fine-tuning of GPT-3-scale models, with no
+measurable quality loss on the tasks tested. For a 360M SLM the absolute savings are smaller but the practical effect
+is the same: you can tune on a laptop-adjacent GPU.</p>
+
+<h2>LoRA configuration that works</h2>
+<pre><code>from peft import LoraConfig, get_peft_model, TaskType
+
+cfg = LoraConfig(
+    task_type=TaskType.CAUSAL_LM,
+    r=16,                     # rank: 8 for ≤10 classes, 16–32 for extraction tasks
+    lora_alpha=32,            # keep alpha = 2r as a starting point
+    lora_dropout=0.05,
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],   # all attention projections
+    bias="none",
+)
+model = get_peft_model(base_model, cfg)
+model.print_trainable_parameters()
+# trainable params: 2,949,120 || all params: 362,289,152 || trainable%: 0.81</code></pre>
+
+<div class="callout tip"><b>Target all four projections</b>
+Tuning only <code>q_proj</code>/<code>v_proj</code> (the original paper's choice for GPT-3) underperforms on
+classification-style tasks at small scale. Adding <code>k_proj</code> and <code>o_proj</code> typically recovers 1–3
+points for ~2× the (still tiny) adapter size.</div>
+
+<h2>Supervised fine-tuning for a decision task</h2>
+<p>Two recipes. Pick by whether you need a rationale.</p>
+<h3>A. Classification head (encoder, or decoder with a head)</h3>
+<pre><code>from transformers import AutoModelForSequenceClassification, TrainingArguments, Trainer
+import torch
+
+model = AutoModelForSequenceClassification.from_pretrained(
+    "distilbert-base-uncased", num_labels=len(LABELS),
+    id2label=dict(enumerate(LABELS)), label2id={l: i for i, l in enumerate(LABELS)},
+)
+
+args = TrainingArguments(
+    output_dir="out/clf",
+    learning_rate=2e-5,          # encoders: 1e-5 – 5e-5
+    per_device_train_batch_size=32,
+    num_train_epochs=4,          # small datasets overfit fast; watch val
+    weight_decay=0.01,
+    warmup_ratio=0.06,
+    eval_strategy="epoch",
+    metric_for_best_model="macro_f1",
+    load_best_model_at_end=True,
+    fp16=torch.cuda.is_available(),
+)
+Trainer(model=model, args=args, train_dataset=ds_train, eval_dataset=ds_val,
+        compute_metrics=classification_metrics).train()</code></pre>
+
+<h3>B. Instruction format with a rationale (decoder)</h3>
+<pre><code>PROMPT = &quot;&quot;&quot;You are a claims triage model. Choose exactly one action.
+
+Claim: {claim}
+Policy: {policy_excerpt}
+
+Reply with JSON only:
+{{"action": "approve|review|decline", "confidence": 0.0-1.0, "reason_code": "R1..R9"}}&quot;&quot;&quot;
+
+example = {
+    "text": PROMPT.format(claim=c.text, policy_excerpt=c.policy),
+    "completion": '{"action": "review", "confidence": 0.72, "reason_code": "R4"}',
+}</code></pre>
+<p>Train on the completion only — mask the prompt tokens out of the loss. For a decision model the JSON skeleton is
+part of the contract: validate it at inference (see <a href="../testing/edge-cases.html">edge cases</a>) and treat a
+schema violation as an abstain, not as a parse error to paper over.</p>
+
+<h2>Cost-sensitive fine-tuning</h2>
+<p>Standard cross-entropy treats all mistakes equally. Your cost matrix does not. Two ways to fix it:</p>
+<pre><code># 1. class weights derived from the cost matrix (cheap, effective)
+w = torch.tensor([1.0, 4.0, 12.0])       # proportional to mean cost of each misclassification
+loss = F.cross_entropy(logits, labels, weight=w)
+
+# 2. direct expected-cost loss over the softmax (better when costs are asymmetric per pair)
+p = F.softmax(logits, dim=-1)
+cost = torch.einsum("bn,nm->bm", p, cost_matrix)     # cost_matrix[n, m] = cost of predicting n when truth is m
+loss = cost.gather(1, labels.view(-1, 1)).mean()</code></pre>
+<p>Method 2 usually buys 5–15% reduction in realised cost per case over weighted CE, at the price of losing calibration
+— recalibrate afterwards.</p>
+
+<h2>Data hygiene, in order of impact</h2>
+<ol>
+<li><b>Label noise.</b> Two annotators on a 200-example sample; measure Cohen's κ. Below 0.6, fix the guideline before
+touching the model. No architecture recovers from a 25%-noisy label set.</li>
+<li><b>Leakage.</b> Split by entity (customer, document, patient), not by row. Row-level splits inflate accuracy by
+5–20 points on duplicated content.</li>
+<li><b>Balance.</b> Keep every rare class at ≥ 50 examples, or merge classes until you can.</li>
+<li><b>Length and language coverage.</b> Long inputs get truncated silently; check the token-length histogram against
+your <code>max_length</code>.</li>
+</ol>
+
+<h2>Hyperparameters that actually matter</h2>
+<table>
+<thead><tr><th>Knob</th><th>Range to search</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td>Learning rate</td><td>1e-5 – 5e-5 (encoder), 1e-4 – 3e-4 (LoRA)</td><td>Largest single effect; LoRA tolerates ~10× higher LR</td></tr>
+<tr><td>Epochs</td><td>2–5</td><td>Beyond 5, small datasets memorise</td></tr>
+<tr><td>LoRA rank</td><td>8 / 16 / 32</td><td>Diminishing returns above 32 for classification</td></tr>
+<tr><td>Max length</td><td>p95 of token counts</td><td>Halving length roughly halves attention cost</td></tr>
+<tr><td>Batch size</td><td>16–64</td><td>Mostly a throughput knob; use grad accumulation to reach it</td></tr>
+</tbody>
+</table>
+
+<h2>Adapter versioning</h2>
+<p>A LoRA adapter is 5–40 MB — small enough to version like a config file. Store with each adapter: base model
+revision hash, training data snapshot id, hyperparameters, eval report, and the calibration temperature. Without the
+last two you cannot reproduce a decision, and in a regulated setting that is a blocker on its own.</p>
+
+<pre><code>out/claims-lora-v3/
+├── adapter_config.json
+├── adapter_model.safetensors
+├── calibration.json          # {"temperature": 1.42, "fit_on": "val-2026-09", "ece": 0.031}
+├── eval_report.json          # macro_f1, cost_per_case, abstain_rate, per-class recall
+└── manifest.json             # base model + revision, data snapshot, code commit</code></pre>
+
+<p>Next: <a href="06-prompt-engineering.html">prompt engineering</a> when you cannot fine-tune, or
+<a href="07-hybrid-systems.html">hybrid systems</a> when the decision needs more than one model call.</p>
+
+  <div class="pager"><a class="prev" href="../guides/04-distillation.html"><span class="dir">Previous</span>04 · Distillation</a><a class="next" href="../guides/06-prompt-engineering.html"><span class="dir">Next</span>06 · Prompt engineering</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

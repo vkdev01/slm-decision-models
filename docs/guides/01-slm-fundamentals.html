@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SLM fundamentals · SLM Decision Models</title>
+<meta name="description" content="What a small language model actually is, how big is small, and where the compute goes.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item active" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Guides / SLM fundamentals</div>
+  <h1>SLM fundamentals</h1>
+  <p class="subtitle">What a small language model actually is, how big is small, and where the compute goes.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>"Small" is a moving target. In this guide an SLM is a transformer decoder or encoder with roughly
+<b>10M to 4B parameters</b> that can run on one CPU core-group or a single consumer GPU. That range covers two very
+different families, and knowing which one you have changes your entire plan.</p>
+
+<h2>Two families, two different jobs</h2>
+<table>
+<thead><tr><th></th><th>Encoder-only (BERT-style)</th><th>Decoder-only (GPT-style)</th></tr></thead>
+<tbody>
+<tr><td>Examples</td><td>DistilBERT 66M, MiniLM-L6 22M, DeBERTa-v3-xsmall 22M</td><td>SmolLM2 135M/360M/1.7B, Qwen2.5 0.5B/1.5B/3B, Phi-3-mini 3.8B, TinyLlama 1.1B</td></tr>
+<tr><td>Output</td><td>Fixed label distribution over your classes</td><td>Free text, then parsed into a label</td></tr>
+<tr><td>Latency (CPU, seq 256)</td><td>1–15 ms</td><td>15 ms–2 s depending on generated tokens</td></tr>
+<tr><td>Decision fit</td><td>Excellent — a classifier <i>is</i> a decision function</td><td>Good when the decision needs reasoning over long context</td></tr>
+<tr><td>Failure mode</td><td>Confidently wrong on out-of-distribution input</td><td>Confidently wrong <i>and</i> fluent about it; schema violations</td></tr>
+<tr><td>Trainable on</td><td>Single CPU-hour to a few GPU-hours</td><td>Single GPU-day with LoRA, more for full tuning</td></tr>
+</tbody>
+</table>
+
+<div class="callout tip"><b>Default recommendation</b>
+If your decision is "pick one of N labels from this text", use an encoder-only model. Reach for a decoder only when
+the input is long, the rule is not expressible as a label, or you need the model to call tools.</div>
+
+<h2>Where the parameters and the FLOPs go</h2>
+<p>A decoder block at hidden size $$d$$ with $$L$$ layers and vocabulary $$V$$ holds roughly:</p>
+<pre><code>params ≈ L · (12·d²  +  13·d² for gated MLPs)  +  V·d        # embeddings dominate at small d
+FLOPs per token ≈ 2 · params                                 # forward pass, rule of thumb
+KV cache bytes ≈ 2 · L · d · n_kv_heads/n_heads · bytes_per_elem · seq_len</code></pre>
+<p>Worked example — SmolLM2-360M-ish shape ($$d=960$$, $$L=32$$, $$V=49152$$):</p>
+<table>
+<thead><tr><th>Component</th><th>Parameters</th><th>Share</th></tr></thead>
+<tbody>
+<tr><td>Embeddings (tied)</td><td>47.2M</td><td>13%</td></tr>
+<tr><td>Attention + MLP, 32 layers</td><td>≈ 311M</td><td>87%</td></tr>
+<tr><td>Total</td><td>≈ 358M</td><td>100%</td></tr>
+<tr><td>Weights at FP32 / FP16 / INT8 / INT4</td><td>1.43 GB / 716 MB / 358 MB / 179 MB</td><td>—</td></tr>
+</tbody>
+</table>
+<p>The embedding share is why small models are <i>relatively</i> more embedding-heavy: shrinking layers while keeping a
+50k vocabulary leaves a floor you cannot quantise away cheaply. Trimming the vocabulary to your domain's token set is
+a real optimisation, not a micro-optimisation.</p>
+
+<h2>Memory budget for inference</h2>
+<pre><code>total_memory ≈ weights + KV_cache + activations + runtime_overhead
+weights     = params × bytes_per_param          # 4 FP32, 2 FP16, 1 INT8, 0.5 INT4
+KV_cache    = 2 × L × d × seq_len × batch × bytes_per_param
+activations ≈ small for batch 1, grows with batch × seq_len</code></pre>
+<p>For a 360M model at INT8, batch 1, 512 tokens: 358 MB weights + ~25 MB KV cache + overhead ≈ 450 MB resident. That
+is the number that decides whether your container fits a 512 MiB edge box.</p>
+
+<h2>What SLMs are good and bad at</h2>
+<div class="grid">
+  <div class="card"><h4>Good</h4><p>Classification, extraction into a fixed schema, routing, short-form judgement with clear criteria, rewriting, tagging, severity scoring.</p></div>
+  <div class="card"><h4>Fragile</h4><p>Multi-step arithmetic, long-horizon planning, anything needing 2024-era world knowledge, tasks where the label depends on a rarely-seen token.</p></div>
+</div>
+<p>Empirically the capability cliff sits around tasks that need more than ~3 reasoning hops without tool support.
+Below that, a well-tuned 360M model can match a 7B model on a narrow, well-labelled task — that is the entire
+economic argument for distillation in <a href="04-distillation.html">chapter 04</a>.</p>
+
+<h2>Tokenisation is a decision variable</h2>
+<p>Tokenisers set your latency floor. A 32k-vocab BPE splits Hindi or Tamil text into 2–4× more tokens than English,
+which multiplies cost and latency for the same content. Measure it before you commit:</p>
+<pre><code>from transformers import AutoTokenizer
+tok = AutoTokenizer.from_pretrained("HuggingFaceTB/SmolLM2-360M-Instruct")
+for s in ["claim denied, resubmit with invoice",
+          "दावा अस्वीकृत, कृपया चालान के साथ पुनः भेजें"]:
+    print(len(tok(s).input_ids), s[:32])</code></pre>
+
+<h2>Checklist before choosing a base model</h2>
+<ul class="checklist">
+<li>Label set is closed and small (≤ 50 classes) → encoder-only, classification head.</li>
+<li>Input longer than ~1k tokens → decoder with 4k+ context, or a retrieval step first.</li>
+<li>Licence permits commercial use (check the model card, not the paper).</li>
+<li>Tokenizer covers your language and domain vocabulary efficiently.</li>
+<li>Quantised size fits your smallest deployment target, not your largest.</li>
+<li>You have a teacher model or ≥ 1k labelled examples — otherwise see prompting in <a href="06-prompt-engineering.html">chapter 06</a>.</li>
+</ul>
+
+  <div class="pager"><a class="prev" href="../guides/00-quick-start.html"><span class="dir">Previous</span>00 · Quick start</a><a class="next" href="../guides/02-decision-theory.html"><span class="dir">Next</span>02 · Decision theory</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

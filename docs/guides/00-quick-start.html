@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick start · SLM Decision Models</title>
+<meta name="description" content="From clone to a calibrated, cost-aware decision model in under thirty minutes — CPU only.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item active" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Guides / Quick start</div>
+  <h1>Quick start</h1>
+  <p class="subtitle">From clone to a calibrated, cost-aware decision model in under thirty minutes — CPU only.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>This chapter gets you to a working decision pipeline with no GPU and no model download. You will build a
+<em>policy</em>, score it under a cost matrix, calibrate it, and see the three numbers that decide whether it is
+shippable.</p>
+
+<h2>1. Install</h2>
+<pre><code>git clone https://github.com/vkdev01/slm-decision-models.git
+cd slm-decision-models
+python -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt
+pip install -e code/          # installs the slm_decision package</code></pre>
+<p>The core path needs only <code>numpy</code> and <code>pandas</code>. Torch and transformers are optional extras,
+imported lazily, so the test suite and the metrics layer run on a laptop with nothing else installed:</p>
+<pre><code>pip install -r requirements.txt          # core: numpy, pandas
+pip install ".[ml]"                      # adds torch, transformers, datasets, scikit-learn</code></pre>
+
+<h2>2. Define the decision, not the prompt</h2>
+<p>The first artefact in a decision project is a spec file, not a model. It fixes the action set, the cost of each
+mistake, and the abstain path:</p>
+<pre><code>from slm_decision import DecisionSpec
+
+spec = DecisionSpec(
+    name="loan_triage",
+    actions=["auto_approve", "manual_review", "decline"],
+    # (predicted action, true outcome) -> cost in rupees of expected loss
+    costs={
+        ("auto_approve", "default"): 120_000,
+        ("auto_approve", "repaid"): 0,
+        ("manual_review", "default"): 900,
+        ("manual_review", "repaid"): 900,
+        ("decline", "default"): 0,
+        ("decline", "repaid"): 24_000,   # lost margin on a good customer
+    },
+    abstain="manual_review",
+    max_abstain_rate=0.25,
+)
+spec.validate()</code></pre>
+<p>Costs are in whatever unit you can defend in a meeting. Ratios matter more than absolutes: here a false approval
+costs 5× a false decline and 133× a manual review, which is what pushes the policy toward abstaining.</p>
+
+<h2>3. Get scores from the cheapest thing that works</h2>
+<p>Always start with a rule or a logistic baseline. It gives you a floor and a sanity check for the SLM:</p>
+<pre><code>import numpy as np
+from slm_decision import RulePolicy, evaluate_policy
+
+rng = np.random.default_rng(0)
+# stand-in for real features -> probability of default
+scores = rng.beta(2, 5, size=2000)          # p(default)
+y_true = (rng.random(2000) &lt; scores).astype(int)   # calibrated-by-construction toy data
+
+policy = RulePolicy(spec, threshold=0.45)
+report = evaluate_policy(spec, policy, y_true=y_true, scores=scores)
+print(report)</code></pre>
+<pre><code>policy                 loan_triage
+n                      2000
+accuracy               0.842
+cost_per_case          1318.4
+abstain_rate           0.187
+coverage               0.813
+ece                    0.014</code></pre>
+
+<h2>4. Swap in the SLM behind the same interface</h2>
+<p>The point of the spec is that the model is replaceable. The SLM produces the score; everything downstream is
+unchanged.</p>
+<pre><code>from slm_decision import SLMDecisionModel
+
+model = SLMDecisionModel.from_pretrained(
+    "HuggingFaceTB/SmolLM2-360M-Instruct",
+    actions=spec.actions,
+)
+policy = model.as_policy(spec, prompt="Rate default risk 0-1 and answer with a single number.")
+report = evaluate_policy(spec, policy, y_true=y_true, scores=customer_scores)</code></pre>
+
+<h2>5. Calibrate before you ship</h2>
+<p>Raw model scores are usually over-confident. Fit a temperature on a held-out slice, then re-measure:</p>
+<pre><code>from slm_decision import TemperatureCalibrator
+
+cal = TemperatureCalibrator().fit(scores_val, y_val)
+scores_test_cal = cal.transform(scores_test)
+
+print("ECE before:", round(ece(scores_test, y_test), 4))
+print("ECE after :", round(ece(scores_test_cal, y_test), 4))
+print("T         :", round(cal.temperature, 3))</code></pre>
+
+<h2>The three numbers that decide go/no-go</h2>
+<table>
+<thead><tr><th>Metric</th><th>Question it answers</th><th>Typical gate</th></tr></thead>
+<tbody>
+<tr><td><code>cost_per_case</code></td><td>Is this cheaper than the human process it replaces?</td><td>Below current baseline by a margin you can defend</td></tr>
+<tr><td><code>abstain_rate</code></td><td>Can operations absorb the escalations?</td><td>Within the staffing plan, e.g. ≤ 25%</td></tr>
+<tr><td><code>ece</code></td><td>Can downstream thresholds be trusted?</td><td>≤ 0.05 after calibration</td></tr>
+</tbody>
+</table>
+
+<div class="callout"><b>Order of operations</b>
+Spec → baseline → SLM → calibrate → cost-optimise thresholds → test → deploy. Teams that start with the model and
+retrofit a cost matrix spend months tuning an objective they cannot state.</div>
+
+<h2>Next</h2>
+<p>Continue to <a href="01-slm-fundamentals.html">SLM fundamentals</a> for the architecture and sizing maths, or go
+straight to <a href="04-distillation.html">distillation</a> if you already have a teacher model in mind.</p>
+
+  <div class="pager"><a class="prev" href="../index.html"><span class="dir">Previous</span>Overview</a><a class="next" href="../guides/01-slm-fundamentals.html"><span class="dir">Next</span>01 · SLM fundamentals</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

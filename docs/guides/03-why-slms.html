@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why SLMs for decisions · SLM Decision Models</title>
+<meta name="description" content="Cost, latency, privacy and controllability — with the arithmetic that makes the case, and the cases where it does not.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item active" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Guides / Why SLMs for decisions</div>
+  <h1>Why SLMs for decisions</h1>
+  <p class="subtitle">Cost, latency, privacy and controllability — with the arithmetic that makes the case, and the cases where it does not.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>The honest framing: an SLM is not a worse version of a large model. For a <em>closed decision task</em> it is a
+different tool with a different cost structure, and the economics usually dominate.</p>
+
+<h2>The arithmetic</h2>
+<p>Take a classification decision over 5M cases/month with ~600 input tokens each.</p>
+<table>
+<thead><tr><th></th><th>Frontier API (assumed)</th><th>7B self-hosted</th><th>360M SLM, INT8</th></tr></thead>
+<tbody>
+<tr><td>Weights in memory</td><td>n/a</td><td>14 GB FP16</td><td>360 MB</td></tr>
+<tr><td>GPU needed</td><td>none (vendor)</td><td>1× 24 GB</td><td>none — CPU or 4 GB GPU</td></tr>
+<tr><td>p50 latency</td><td>400–1500 ms</td><td>60–180 ms</td><td>8–30 ms</td></tr>
+<tr><td>Throughput per core</td><td>rate-limited</td><td>~40 req/s per GPU</td><td>~120 req/s per vCPU</td></tr>
+<tr><td>Marginal cost per case</td><td>₹0.15–₹2.00</td><td>₹0.02–₹0.08</td><td>₹0.0005–₹0.004</td></tr>
+<tr><td>Monthly inference bill</td><td>₹7.5L–₹1Cr</td><td>₹1L–₹4L</td><td>₹2.5k–₹20k</td></tr>
+</tbody>
+</table>
+<p class="mono" style="font-size:12.5px;color:#5c6472">Illustrative model, not a quote. Substitute your own token
+counts, instance pricing and utilisation before using this table in a business case. The ratios, not the absolute
+rupees, are the argument: two to three orders of magnitude between a frontier API call and a self-hosted SLM.</p>
+
+<h2>Five reasons that survive scrutiny</h2>
+<ol>
+<li><b>Latency as a feature, not a cost.</b> 10 ms versus 600 ms changes the product. Sub-50 ms enables inline
+decisions — flag a transaction while it authorises, route a support ticket before the customer finishes typing.</li>
+<li><b>Privacy by architecture.</b> Data that never leaves the VPC cannot be leaked by a vendor. For health records,
+bank statements or employee data this is often the deciding constraint, not a bonus.</li>
+<li><b>Determinism and auditability.</b> With temperature 0, a fixed prompt, a pinned tokenizer and a pinned
+quantisation, you can reproduce a decision bit-for-bit years later. Frontier APIs change under you; a versioned
+model artefact does not.</li>
+<li><b>Cost per decision near zero.</b> Once the model is in memory, marginal cost is dominated by the request path,
+not the model. That makes high-volume, low-value decisions (tag every line item) economically possible.</li>
+<li><b>Constrained output spaces.</b> A classification head cannot emit an unparseable string. With a decoder you get
+the same guarantee via grammar-constrained decoding or a strict schema validator — see
+<a href="../testing/edge-cases.html">edge cases</a>.</li>
+</ol>
+
+<h2>Where an SLM is the wrong tool</h2>
+<table>
+<thead><tr><th>Situation</th><th>Why SLMs struggle</th><th>Do this instead</th></tr></thead>
+<tbody>
+<tr><td>Open-ended generation quality matters</td><td>Fluency and breadth are parameter-bound</td><td>Frontier model, human in the loop</td></tr>
+<tr><td>Decisions need recent world knowledge</td><td>Weights are frozen at training cutoff</td><td>Retrieval + SLM, or a tool call</td></tr>
+<tr><td>Long-horizon multi-step planning</td><td>Error compounding over hops</td><td>Planner LLM + SLM executors (hybrid, ch. 07)</td></tr>
+<tr><td>Zero labelled data, no teacher budget</td><td>Cannot be tuned; prompting alone is brittle at this size</td><td>Prompt a large model first, distil later</td></tr>
+<tr><td>Regulated high-stakes decisions</td><td>No SLM alone is a defensible medical device</td><td>SLM as a triage signal inside a governed pathway</td></tr>
+</tbody>
+</table>
+
+<h2>The distillation economics</h2>
+<p>Getting a 360M model to 97% of a 70B teacher's agreement on a narrow task costs roughly:</p>
+<pre><code>teacher labelling    : 100k prompts × ~₹0.40      = ₹40,000   (one-off)
+distillation train   : 3 epochs, 1× A10G, ~6 h     = ₹600
+eval + calibration   : negligible
+total                : ~₹41,000 one-off, then ~₹0.001/case forever</code></pre>
+<p>Break-even against an API at ₹0.40/case is ~100k cases. Above that volume, distillation pays for itself within the
+first month. Below it, use the API and revisit when volume grows — this is the same build-versus-buy calculus as any
+infrastructure decision.</p>
+
+<h2>Accuracy you should expect, by task type</h2>
+<p>From published distillation and small-model tuning results, in terms of <em>agreement with a strong teacher</em>
+on a narrow task — not absolute accuracy:</p>
+<table>
+<thead><tr><th>Task shape</th><th>Typical SLM agreement with teacher</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Topic / intent classification (≤ 20 classes)</td><td>95–99%</td><td>Easiest case; often matched by a linear model on embeddings</td></tr>
+<tr><td>Sentiment / severity ordinal scoring</td><td>90–96%</td><td>Adjacent-class confusion dominates the error</td></tr>
+<tr><td>Span extraction into a schema</td><td>85–95% F1</td><td>Degrades sharply with entity count per document</td></tr>
+<tr><td>Short rationale + label</td><td>80–92%</td><td>Rationale quality is weaker than label quality</td></tr>
+<tr><td>Arithmetic / multi-hop reasoning</td><td>55–80%</td><td>Where SLMs genuinely lose; add tools</td></tr>
+</tbody>
+</table>
+<div class="callout warn"><b>Do not quote these as your result</b>
+These ranges come from published work on specific datasets. Your number depends on label noise, class balance, and
+how much of the decision is genuinely ambiguous. Measure, then compare.</div>
+
+<h2>Decision checklist: SLM or API?</h2>
+<ul class="checklist">
+<li>Volume × API price &gt; build cost within 12 months?</li>
+<li>Latency requirement below what an API round trip allows?</li>
+<li>Data cannot leave your environment (contractual or regulatory)?</li>
+<li>Decision is closed-set and stable over the next 6–12 months?</li>
+<li>You can label or teacher-label ≥ 5k examples?</li>
+<li>You can staff model maintenance (retraining, drift monitoring) for the life of the product?</li>
+</ul>
+<p>Five or more yes: build the SLM. Fewer: wrap the API behind the same <code>DecisionSpec</code> interface so you can
+swap later without rewriting the product.</p>
+
+  <div class="pager"><a class="prev" href="../guides/02-decision-theory.html"><span class="dir">Previous</span>02 · Decision theory</a><a class="next" href="../guides/04-distillation.html"><span class="dir">Next</span>04 · Distillation</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

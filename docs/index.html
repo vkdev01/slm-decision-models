@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overview · SLM Decision Models</title>
+<meta name="description" content="A practical, end-to-end guide to turning small language models (SLMs) into decision systems you can test, measure and ship.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item active" href="index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="code/py-slm-decision.html">Python library</a>
+<a class="item" href="notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="use-cases/finance.html">Finance</a>
+<a class="item" href="use-cases/industrial.html">Industrial</a>
+<a class="item" href="use-cases/gaming.html">Gaming</a>
+<a class="item" href="use-cases/education.html">Education</a>
+<a class="item" href="use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="testing/unit-testing.html">Unit testing</a>
+<a class="item" href="testing/integration-testing.html">Integration testing</a>
+<a class="item" href="testing/edge-cases.html">Edge cases</a>
+<a class="item" href="testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="deployment/docker.html">Docker</a>
+<a class="item" href="deployment/cloud.html">Cloud</a>
+<a class="item" href="deployment/edge.html">Edge devices</a>
+<a class="item" href="deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="benchmarks/metrics.html">Metrics</a>
+<a class="item" href="benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="index.html">Docs</a> / Overview</div>
+  <h1>Overview</h1>
+  <p class="subtitle">A practical, end-to-end guide to turning small language models (SLMs) into decision systems you can test, measure and ship.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<div class="kpis">
+  <div class="stat"><b>135M–4B</b><span>Typical SLM parameter range used in this guide</span></div>
+  <div class="stat"><b>8 guides</b><span>Fundamentals → distillation → fine-tuning → hybrid systems</span></div>
+  <div class="stat"><b>4 notebooks</b><span>Runnable, end-to-end with CPU-only defaults</span></div>
+  <div class="stat"><b>6 domains</b><span>Healthcare, finance, industrial, gaming, education, autonomy</span></div>
+</div>
+
+<p>A language model becomes a <b>decision model</b> the moment its output is used to pick an action. That single
+change raises the bar: a chat model can be "roughly right", a decision model cannot. It must return a defined
+label or action, with a calibrated confidence, an explicit abstain option, a bounded latency, and a documented
+failure mode for every input it will see in production.</p>
+
+<p>This site is the written companion to the <a href="https://github.com/vkdev01/slm-decision-models">slm-decision-models</a>
+repository. Every chapter follows the same shape: the concept, the maths, the numbers you should expect, a working
+code path, and the test that proves it still works after your next change.</p>
+
+<h2>What "decision model" means here</h2>
+<p>A decision model is a function from a messy observation to a committed action under uncertainty. Formally, with
+observation $$x$$, action space $$A$$, and a utility function $$u(a, y)$$ over the true outcome $$y$$:</p>
+<pre><code>a* = argmax_a  E_{p(y|x)}[ u(a, y) ]</code></pre>
+<p>Three properties separate this from ordinary text generation:</p>
+<table>
+<thead><tr><th>Property</th><th>Chat model</th><th>Decision model</th></tr></thead>
+<tbody>
+<tr><td>Output space</td><td>Open text</td><td>Closed set of labels or actions, schema-validated</td></tr>
+<tr><td>Uncertainty</td><td>Implicit, usually uncalibrated</td><td>Explicit score + calibration check (ECE, reliability curve)</td></tr>
+<tr><td>Failure handling</td><td>Free-form apology</td><td>Abstain / escalate, with a defined escalation path</td></tr>
+<tr><td>Evaluation</td><td>Human preference, LLM-as-judge</td><td>Cost-weighted accuracy, regret, coverage at fixed risk</td></tr>
+<tr><td>Latency budget</td><td>Seconds, tolerated</td><td>p95 budget enforced, usually 20–800 ms</td></tr>
+</tbody>
+</table>
+
+<h2>The conversion pipeline</h2>
+<figure class="fig">
+<svg viewBox="0 0 860 190" role="img" aria-label="Pipeline from task definition to monitored deployment">
+  <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8892a6"/></marker></defs>
+  <g font-family="system-ui,sans-serif" font-size="12.5" text-anchor="middle">
+    <g><rect x="6" y="46" width="118" height="64" rx="10" fill="#eef1f8" stroke="#c9d0e2"/><text x="65" y="72" font-weight="700">1 · Frame</text><text x="65" y="90" fill="#5c6472">actions, costs,</text><text x="65" y="104" fill="#5c6472">abstain policy</text></g>
+    <g><rect x="146" y="46" width="118" height="64" rx="10" fill="#eef1f8" stroke="#c9d0e2"/><text x="205" y="72" font-weight="700">2 · Data</text><text x="205" y="90" fill="#5c6472">labels, hard</text><text x="205" y="104" fill="#5c6472">cases, splits</text></g>
+    <g><rect x="286" y="46" width="118" height="64" rx="10" fill="#e6f7f4" stroke="#8fd3c8"/><text x="345" y="72" font-weight="700">3 · Distil</text><text x="345" y="90" fill="#5c6472">teacher → SLM</text><text x="345" y="104" fill="#5c6472">soft targets</text></g>
+    <g><rect x="426" y="46" width="118" height="64" rx="10" fill="#e6f7f4" stroke="#8fd3c8"/><text x="485" y="72" font-weight="700">4 · Tune</text><text x="485" y="90" fill="#5c6472">LoRA / QLoRA</text><text x="485" y="104" fill="#5c6472">task head</text></g>
+    <g><rect x="566" y="46" width="118" height="64" rx="10" fill="#f2f3fe" stroke="#b9bcf3"/><text x="625" y="72" font-weight="700">5 · Calibrate</text><text x="625" y="90" fill="#5c6472">temperature,</text><text x="625" y="104" fill="#5c6472">conformal</text></g>
+    <g><rect x="706" y="46" width="148" height="64" rx="10" fill="#fdf0e3" stroke="#e6bb8b"/><text x="780" y="72" font-weight="700">6 · Deploy</text><text x="780" y="90" fill="#5c6472">quantize, serve,</text><text x="780" y="104" fill="#5c6472">monitor drift</text></g>
+    <g stroke="#8892a6" stroke-width="1.4" marker-end="url(#ar)">
+      <line x1="126" y1="78" x2="142" y2="78"/><line x1="266" y1="78" x2="282" y2="78"/><line x1="406" y1="78" x2="422" y2="78"/>
+      <line x1="546" y1="78" x2="562" y2="78"/><line x1="686" y1="78" x2="702" y2="78"/>
+    </g>
+    <path d="M780,116 L780,152 L65,152 L65,116" fill="none" stroke="#b91c1c" stroke-dasharray="4 4" marker-end="url(#ar)"/>
+    <text x="420" y="172" fill="#b91c1c" font-size="11.5">feedback loop: every production miss becomes a labelled test case</text>
+  </g>
+</svg>
+<figcaption>The six stages are sequential in a first build and continuous afterwards. Stage 6 feeds stage 2 — the
+drift loop is what keeps a decision model from silently degrading.</figcaption>
+</figure>
+
+<h2>Learning path</h2>
+<div class="grid">
+  <div class="card"><h4>New to SLMs</h4><p>Read <a href="guides/01-slm-fundamentals.html">SLM fundamentals</a>, then <a href="guides/03-why-slms.html">why SLMs for decisions</a>. Skim the notebooks.</p></div>
+  <div class="card"><h4>ML engineer</h4><p>Jump to <a href="guides/04-distillation.html">distillation</a> and <a href="guides/05-finetuning.html">fine-tuning</a>, then <a href="testing/benchmarking.html">benchmarking</a>.</p></div>
+  <div class="card"><h4>Product / domain lead</h4><p><a href="guides/02-decision-theory.html">Decision theory</a> for the framing, then the <a href="use-cases/healthcare.html">use cases</a> closest to yours.</p></div>
+  <div class="card"><h4>Platform / SRE</h4><p><a href="deployment/docker.html">Docker</a>, <a href="deployment/edge.html">edge</a>, <a href="deployment/cicd.html">CI/CD</a> and the <a href="testing/edge-cases.html">edge-case</a> suite.</p></div>
+</div>
+
+<h2>Numbers to keep in your head</h2>
+<p>These are published reference points, not results measured on your data. Reproduce them with the scripts in
+<code>benchmarks/</code> before quoting them internally.</p>
+<table>
+<thead><tr><th>Quantity</th><th>Reference value</th><th>Source / caveat</th></tr></thead>
+<tbody>
+<tr><td>DistilBERT vs BERT-base</td><td>40% fewer parameters, 60% faster, ~97% of GLUE retained</td><td>Sanh et al., 2019 — the canonical proof that a 66M model can carry a 110M model's task behaviour</td></tr>
+<tr><td>LoRA trainable parameters</td><td>0.01%–1% of full weights</td><td>Hu et al., 2021 — rank 8–64 adapters on attention projections</td></tr>
+<tr><td>INT8 weight memory</td><td>4× smaller than FP32, 2× smaller than FP16</td><td>Arithmetic, not a benchmark: 1 byte vs 4 bytes per weight</td></tr>
+<tr><td>INT4 weight memory</td><td>8× smaller than FP32</td><td>Quality loss is task-dependent; always re-run the eval suite</td></tr>
+<tr><td>Calibration gap</td><td>Modern deep nets are typically over-confident; ECE of 0.05–0.15 is common pre-calibration</td><td>Guo et al., 2017 — measure your own ECE, never assume</td></tr>
+<tr><td>Conformal guarantee</td><td>Coverage ≥ 1 − α on exchangeable data</td><td>Angelopoulos &amp; Bates, 2021 — distribution-free, but assumes exchangeability</td></tr>
+<tr><td>Self-consistency gain</td><td>Typically +5 to +17 points on arithmetic reasoning benchmarks</td><td>Wang et al., 2023 — costs k× inference; usually unaffordable for real-time decisions</td></tr>
+</tbody>
+</table>
+
+<div class="callout warn"><b>Read this before trusting any table</b>
+Every performance table in this site is either attributed to a published paper or marked <i>illustrative</i>.
+Latency and accuracy depend on your hardware, your tokenizer, your label set and your data. The repo ships the
+scripts; run them on your machine and replace the numbers.</div>
+
+<h2>Repository map</h2>
+<pre><code>slm-decision-models/
+├── docs/                    # this site (GitHub Pages source, served from /docs)
+├── code/src/slm_decision/   # the Python library used in every example
+├── notebooks/               # 4 runnable .ipynb tutorials
+├── tests/                   # pytest suite: metrics, calibration, policies, schema
+├── benchmarks/              # latency + accuracy harness
+└── requirements.txt</code></pre>
+
+<h2>Sixty-second taste</h2>
+<pre><code>from slm_decision import DecisionSpec, RulePolicy, calibrate, expected_cost
+
+spec = DecisionSpec(
+    actions=["approve", "review", "decline"],
+    costs={("approve", "bad"): 10.0, ("decline", "good"): 3.0, ("review", "good"): 0.5},
+    abstain="review",
+)
+
+# A policy is anything that maps a signal in [0,1] to an action under a cost matrix.
+policy = RulePolicy(spec, threshold=0.62)
+print(policy.act(0.71))          # 'approve'
+print(expected_cost(spec, policy, y_true=[1, 0, 1], scores=[0.71, 0.55, 0.9]))</code></pre>
+
+<div class="callout tip"><b>Working code, not pseudocode</b>
+Everything importable here exists in <code>code/src/slm_decision/</code> and is covered by the test suite. If a
+snippet on this site drifts from the library, the test suite is the source of truth — and CI will tell you.</div>
+
+  <div class="pager"><a class="next" href="guides/00-quick-start.html"><span class="dir">Next</span>00 · Quick start</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="assets/script.js"></script>
+</body>
+</html>

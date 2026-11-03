@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Distillation · SLM Decision Models</title>
+<meta name="description" content="Moving a teacher's decision behaviour into a 100× smaller model — with the loss functions, the data recipe and the numbers.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item active" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Guides / Distillation</div>
+  <h1>Distillation</h1>
+  <p class="subtitle">Moving a teacher's decision behaviour into a 100× smaller model — with the loss functions, the data recipe and the numbers.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Distillation is the highest-leverage step in the whole pipeline: it converts an expensive, slow, accurate
+decision-maker into a cheap one. The 2019 DistilBERT result is still the cleanest existence proof — 40% fewer
+parameters, 60% faster inference, ~97% of BERT-base's GLUE score. Nothing about that trick is specific to BERT.</p>
+
+<h2>Three flavours, one idea</h2>
+<table>
+<thead><tr><th>Flavour</th><th>Signal transferred</th><th>Cost</th><th>When to use</th></tr></thead>
+<tbody>
+<tr><td>Response-based (classic KD)</td><td>Teacher's output distribution / logits</td><td>Cheapest — black-box teacher works</td><td>Default. Classification, routing, extraction</td></tr>
+<tr><td>Feature-based</td><td>Hidden states, attention maps</td><td>Needs teacher internals + projection layers</td><td>When logits alone under-constrain the student</td></tr>
+<tr><td>Rationale / CoT distillation</td><td>Teacher's reasoning text, then the label</td><td>Expensive data, cheap inference</td><td>Tasks needing a hop or two of reasoning</td></tr>
+</tbody>
+</table>
+
+<h2>The loss</h2>
+<p>Hinton's original formulation, with temperature $$T$$ and balancing weight $$α$$:</p>
+<pre><code>L = α · CE(y, p_student)  +  (1 − α) · T² · KL( softmax(z_teacher / T) ‖ softmax(z_student / T) )
+
+# α = 0.3, T = 4 are reasonable defaults; tune T in {1, 2, 4, 8}
+# the T² factor keeps gradient magnitudes comparable across temperatures</code></pre>
+<p>The soft targets carry the teacher's <em>similarity structure</em> — the information that "this claim is 0.7
+fraud, 0.2 ambiguous, 0.1 legitimate" is a different case from "0.7 fraud, 0.3 legitimate" even though both argmax to
+fraud. That structure is what makes a 66M student behave like a 110M teacher rather than like a 66M model trained on
+hard labels.</p>
+
+<div class="callout tip"><b>Why soft labels beat hard labels at small model sizes</b>
+Hard labels give one bit of supervision per example; a 20-way teacher distribution gives up to ~4.3 bits. With a small
+student, label efficiency is the binding constraint, so this is where distillation earns its keep.</div>
+
+<h2>Data recipe</h2>
+<p>You need inputs, not labels — the teacher supplies labels. The quality of the input distribution is what decides
+whether the student generalises.</p>
+<table>
+<thead><tr><th>Slice</th><th>Share</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Real production inputs</td><td>50%</td><td>The actual distribution you will be scored on</td></tr>
+<tr><td>Hard / ambiguous cases (near the threshold)</td><td>20%</td><td>Where decisions are actually made</td></tr>
+<tr><td>Synthetic edge cases from templates</td><td>15%</td><td>Coverage for rare-but-expensive inputs</td></tr>
+<tr><td>Adversarial / malformed inputs</td><td>10%</td><td>Teaches the abstain behaviour</td></tr>
+<tr><td>Out-of-scope inputs (should abstain)</td><td>5%</td><td>Without these, the student never learns to refuse</td></tr>
+</tbody>
+</table>
+<p>Sizes that work in practice: <b>5k–20k</b> teacher-labelled examples for a single closed task; <b>50k+</b> if you
+have more than ~20 classes or heavy class imbalance. Below ~2k, prompting beats distillation.</p>
+
+<h2>Reference implementation</h2>
+<pre><code>import torch, torch.nn.functional as F
+
+def distill_step(student, teacher, batch, T=4.0, alpha=0.3):
+    input_ids, attention_mask, y = batch["input_ids"], batch["attention_mask"], batch["labels"]
+
+    with torch.no_grad():
+        t_logits = teacher(input_ids=input_ids, attention_mask=attention_mask).logits
+
+    s_logits = student(input_ids=input_ids, attention_mask=attention_mask).logits
+
+    hard = F.cross_entropy(s_logits, y)
+    soft = F.kl_div(
+        F.log_softmax(s_logits / T, dim=-1),
+        F.softmax(t_logits / T, dim=-1),
+        reduction="batchmean",
+    ) * (T ** 2)
+    return alpha * hard + (1 - alpha) * soft</code></pre>
+
+<h2>Full training loop, encoder student</h2>
+<pre><code>from transformers import (AutoTokenizer, AutoModelForSequenceClassification,
+                          AutoModelForCausalLM, TrainingArguments, Trainer)
+import torch, torch.nn as nn
+
+teacher_ckpt = "meta-llama/Llama-3.1-8B-Instruct"      # any strong teacher
+student_ckpt = "distilbert-base-uncased"
+
+tok = AutoTokenizer.from_pretrained(student_ckpt)
+teacher = AutoModelForCausalLM.from_pretrained(teacher_ckpt, torch_dtype=torch.bfloat16)
+student = AutoModelForSequenceClassification.from_pretrained(student_ckpt, num_labels=N_CLASSES)
+
+class DistillCollator:
+    def __init__(self, tok, max_len=256):
+        self.tok, self.max_len = tok, max_len
+    def __call__(self, rows):
+        enc = self.tok([r["text"] for r in rows], truncation=True,
+                       padding=True, max_length=self.max_len, return_tensors="pt")
+        enc["labels"] = torch.tensor([r["label"] for r in rows])
+        enc["teacher_probs"] = torch.tensor([r["teacher_probs"] for r in rows])  # pre-computed
+        return enc
+
+class DistillTrainer(Trainer):
+    def compute_loss(self, model, inputs, return_outputs=False, **kw):
+        labels = inputs.pop("labels"); tp = inputs.pop("teacher_probs")
+        logits = model(**inputs).logits
+        loss = 0.3 * F.cross_entropy(logits, labels) + \
+               0.7 * F.kl_div(F.log_softmax(logits / 4, -1), tp, reduction="batchmean") * 16
+        return (loss, {"logits": logits}) if return_outputs else loss
+
+args = TrainingArguments(
+    output_dir="out/distil-bert", num_train_epochs=3,
+    per_device_train_batch_size=32, learning_rate=5e-5,
+    eval_strategy="epoch", save_strategy="epoch",
+    fp16=torch.cuda.is_available(), logging_steps=50,
+)
+Trainer(model=student, args=args, train_dataset=ds_train, eval_dataset=ds_val,
+        data_collator=DistillCollator(tok), compute_metrics=task_metrics).train()</code></pre>
+
+<div class="callout"><b>Pre-compute teacher logits</b>
+Teacher inference is the expensive part. Run it once over the whole dataset, store <code>teacher_probs</code> as
+float16 (a 20-class problem costs 40 bytes per example), then train the student multiple times without touching the
+teacher. This turns a 3-hour loop into a 3-minute one.</div>
+
+<h2>What to expect — agreement with teacher</h2>
+<p>Reference points from published distillation work and typical practitioner reports. Re-measure on your task.</p>
+<table>
+<thead><tr><th>Student</th><th>Teacher</th><th>Task</th><th>Agreement</th><th>Speedup</th></tr></thead>
+<tbody>
+<tr><td>DistilBERT 66M</td><td>BERT-base 110M</td><td>GLUE average</td><td>~97% of teacher score</td><td>1.6× faster, 40% smaller (Sanh et al.)</td></tr>
+<tr><td>MiniLM-L6 22M</td><td>BERT-base 110M</td><td>GLUE average</td><td>~98% (with deep self-attention transfer)</td><td>~3× faster</td></tr>
+<tr><td>360M decoder</td><td>8B decoder</td><td>Intent routing, 14 classes</td><td>96–98%</td><td>20–40×</td></tr>
+<tr><td>360M decoder</td><td>8B decoder</td><td>Contract clause extraction</td><td>88–93% F1</td><td>20–40×</td></tr>
+<tr><td>135M decoder</td><td>8B decoder</td><td>Same routing task</td><td>91–95%</td><td>60–100×</td></tr>
+</tbody>
+</table>
+
+<h2>Diagnosing a bad student</h2>
+<table>
+<thead><tr><th>Symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>Student matches teacher on train, collapses on val</td><td>Input distribution too narrow</td><td>Add production and hard-case data; rebalance the mix</td></tr>
+<tr><td>Uniformly worse by 5–10 points</td><td>Temperature too low (≈ hard labels)</td><td>Raise T to 4–8; verify teacher probabilities are not one-hot</td></tr>
+<tr><td>Great on majority class, near-zero on rare class</td><td>Class imbalance in soft targets</td><td>Class-weighted CE term, or oversample rare classes</td></tr>
+<tr><td>Confident and wrong on weird inputs</td><td>No out-of-scope data</td><td>Add the 5% OOS slice; add an abstain class</td></tr>
+<tr><td>Teacher itself is wrong 15% of the time</td><td>Teacher noise is the ceiling</td><td>You cannot distil past it — fix labels or accept the ceiling</td></tr>
+</tbody>
+</table>
+
+<h2>Three-stage schedule that works</h2>
+<ol>
+<li><b>Teacher labelling</b> — 10k inputs, temperature 0.7, 3 samples per input, average the distributions. Averaging
+reduces teacher variance and gives softer, more informative targets.</li>
+<li><b>Distil</b> — 3 epochs, T = 4, α = 0.3, LR 5e-5 with linear decay, batch 32. Stop on validation agreement, not
+train loss.</li>
+<li><b>Calibrate</b> — fit temperature on a held-out slice (see <a href="../benchmarks/metrics.html">metrics</a>).
+Distilled students inherit the teacher's over-confidence, sometimes amplified.</li>
+</ol>
+
+<p>Continue to <a href="05-finetuning.html">fine-tuning</a> when you have real labels rather than teacher labels, or
+when you need to push past the teacher's ceiling with domain data.</p>
+
+  <div class="pager"><a class="prev" href="../guides/03-why-slms.html"><span class="dir">Previous</span>03 · Why SLMs for decisions</a><a class="next" href="../guides/05-finetuning.html"><span class="dir">Next</span>05 · Fine-tuning</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decision theory · SLM Decision Models</title>
+<meta name="description" content="The five-line version of expected utility, the cost matrix that replaces accuracy, and how to price abstention.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item active" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Guides / Decision theory</div>
+  <h1>Decision theory</h1>
+  <p class="subtitle">The five-line version of expected utility, the cost matrix that replaces accuracy, and how to price abstention.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Most ML projects optimise accuracy and then hope it translates into value. A decision model inverts that: you
+state the value function first, and accuracy becomes one input to it.</p>
+
+<h2>Expected utility, minimally</h2>
+<p>Given observation $$x$$, action $$a$$, and outcome $$y$$ with posterior $$p(y|x)$$:</p>
+<pre><code>EU(a | x) = Σ_y  p(y | x) · u(a, y)
+a*        = argmax_a EU(a | x)</code></pre>
+<p>Two consequences drive everything else in this guide:</p>
+<ul>
+<li><b>You need probabilities, not labels.</b> A hard label throws away the information that makes the argmax correct
+under asymmetric costs. This is why <a href="../benchmarks/metrics.html">calibration</a> is a first-class metric.</li>
+<li><b>The threshold is not 0.5.</b> It is where the expected utilities of two actions cross, which depends only on
+the cost ratio and the posterior.</li>
+</ul>
+
+<h2>Thresholds fall out of the cost matrix</h2>
+<p>Binary case: approve if the case is good, decline if bad. Let $$c_FP$$ be the cost of approving a bad case and
+$$c_FN$$ the cost of declining a good one. Then:</p>
+<pre><code>approve  ⟺  p(good|x) · 0  +  p(bad|x) · c_FP   <   p(good|x) · c_FN
+         ⟺  p(good|x)  >  c_FP / (c_FP + c_FN)
+
+# c_FP = 120,000 and c_FN = 24,000  →  threshold = 120000/144000 = 0.833
+# c_FP = 1,000   and c_FN = 9,000   →  threshold = 0.100</code></pre>
+<p>A 5:1 cost ratio moves the threshold to 0.83 — far from the 0.5 that accuracy-based training implicitly assumes.
+Publishing that number, with its derivation, is usually the highest-value artefact a decision team produces.</p>
+
+<h2>The three-action case: pricing abstention</h2>
+<p>Abstention is not free and not cowardly; it is an action with a cost. With a manual-review action at cost
+$$c_rev$$ per case:</p>
+<table>
+<thead><tr><th>Action</th><th>Cost if truly bad</th><th>Cost if truly good</th><th>Expected cost</th></tr></thead>
+<tbody>
+<tr><td>auto_approve</td><td>120,000</td><td>0</td><td>120,000 · p(bad)</td></tr>
+<tr><td>manual_review</td><td>900</td><td>900</td><td>900</td></tr>
+<tr><td>decline</td><td>0</td><td>24,000</td><td>24,000 · p(good)</td></tr>
+</tbody>
+</table>
+<p>Solving the three-way argmax gives two thresholds rather than one. With these numbers, review beats approve when
+$$120,000 · p_bad > 900$$, i.e. $$p_bad > 0.0075$$, and review beats decline when
+$$24,000 · p_good > 900$$, i.e. $$p_good > 0.0375$$. So:</p>
+<pre><code>p_bad < 0.0075              -> auto_approve
+0.0075 <= p_bad <= 0.9625   -> manual_review     (a 95% wide band!)
+p_bad > 0.9625              -> decline</code></pre>
+<div class="callout warn"><b>This is the uncomfortable result</b>
+Cheap review makes abstention optimal for almost every case. That is correct arithmetic and a terrible product. The
+fix is to constrain the problem — raise $$c_rev$$ to reflect real reviewer cost per case (salary + queue + SLA),
+add a capacity constraint, or restrict abstention to a fixed budget ($$≤ 25%$$) and optimise cost inside that
+budget. Never ship an unconstrained argmax without looking at the abstain rate it implies.</div>
+
+<h2>Decision criteria under deep uncertainty</h2>
+<p>When you cannot defend a probability, use a different criterion:</p>
+<table>
+<thead><tr><th>Criterion</th><th>Rule</th><th>Use when</th></tr></thead>
+<tbody>
+<tr><td>Expected utility</td><td>argmax of probability-weighted payoff</td><td>Probabilities are calibrated and costs known</td></tr>
+<tr><td>Maximin</td><td>argmax of the worst-case payoff</td><td>Tail risk is unacceptable (safety, medical)</td></tr>
+<tr><td>Minimax regret</td><td>argmin of the worst-case regret vs the best action in hindsight</td><td>Costs are known, probabilities are not</td></tr>
+<tr><td>Satisficing</td><td>First action meeting a threshold on all criteria</td><td>Real-time routing with hard SLAs</td></tr>
+<tr><td>Value of information</td><td>Act only if the expected gain from another observation exceeds its cost</td><td>You can buy a second signal (lab test, API call)</td></tr>
+</tbody>
+</table>
+
+<h2>Value of information: when to pay for another look</h2>
+<pre><code>EVSI = E_z[ max_a EU(a | x, z) ] - max_a EU(a | x) - cost(z)</code></pre>
+<p>If the expected value of sample information is below the cost of the sample, decide now. This is the principled
+version of "should the model call the database before answering?" — and the correct answer is usually no, because
+latency and cost dominate.</p>
+
+<h2>Regret, and why it is the metric for continuous improvement</h2>
+<pre><code>regret(x) = EU(a_optimal | x) - EU(a_chosen | x)      # always >= 0</code></pre>
+<p>Regret decomposes into three attributable parts, which is what makes it useful operationally:</p>
+<ol>
+<li><b>Model regret</b> — the posterior was wrong. Fix with data, distillation, fine-tuning.</li>
+<li><b>Approximation regret</b> — the posterior was right, the policy was wrong (bad thresholds, uncalibrated scores). Fix with calibration.</li>
+<li><b>Constraint regret</b> — the right action was blocked by a rule, a budget or a policy. Fix with the business owner.</li>
+</ol>
+<p>Track the three separately. Otherwise every degradation looks like "the model got worse" and nobody knows whose
+backlog it belongs in.</p>
+
+<h2>Worked end-to-end example</h2>
+<pre><code>from slm_decision import DecisionSpec, cost_optimal_policy, evaluate_policy
+
+spec = DecisionSpec(
+    actions=["auto_approve", "manual_review", "decline"],
+    costs={("auto_approve","default"):120_000, ("auto_approve","repaid"):0,
+           ("manual_review","default"):900,  ("manual_review","repaid"):900,
+           ("decline","default"):0,          ("decline","repaid"):24_000},
+    abstain="manual_review", max_abstain_rate=0.25,
+)
+policy = cost_optimal_policy(spec)          # solves the argmax, then applies the abstain cap
+report = evaluate_policy(spec, policy, y_true=y_test, scores=p_test)
+print(report.cost_per_case, report.abstain_rate, report.ece)</code></pre>
+<p>The library's <code>cost_optimal_policy</code> solves the unconstrained argmax first, then tightens the abstain band
+until the rate meets <code>max_abstain_rate</code> — the constrained version of the table above.</p>
+
+<div class="callout"><b>Reading next</b>
+With framing settled, <a href="03-why-slms.html">chapter 03</a> covers why an SLM is the right engine for this, and
+<a href="04-distillation.html">chapter 04</a> shows how to get the task behaviour out of a larger teacher.</div>
+
+  <div class="pager"><a class="prev" href="../guides/01-slm-fundamentals.html"><span class="dir">Previous</span>01 · SLM fundamentals</a><a class="next" href="../guides/03-why-slms.html"><span class="dir">Next</span>03 · Why SLMs for decisions</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

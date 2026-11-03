@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prompt engineering · SLM Decision Models</title>
+<meta name="description" content="Making a frozen SLM decide reliably: schemas, few-shot selection, constrained decoding and self-consistency's real cost.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item active" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Guides / Prompt engineering</div>
+  <h1>Prompt engineering</h1>
+  <p class="subtitle">Making a frozen SLM decide reliably: schemas, few-shot selection, constrained decoding and self-consistency's real cost.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Prompting is the zero-training path. On an SLM it is less forgiving than on a frontier model — a 360M model has
+little spare capacity for instruction-following, so the prompt has to do structural work that a larger model would do
+itself.</p>
+
+<h2>The seven-part prompt</h2>
+<table>
+<thead><tr><th>Part</th><th>Purpose</th><th>Example</th></tr></thead>
+<tbody>
+<tr><td>Role</td><td>Narrows the distribution</td><td>"You triage insurance claims."</td></tr>
+<tr><td>Task</td><td>One sentence, one verb</td><td>"Choose exactly one action."</td></tr>
+<tr><td>Label definitions</td><td>Removes ambiguity between adjacent classes</td><td>"review = missing documents OR value &gt; ₹5L"</td></tr>
+<tr><td>Decision rules</td><td>The tie-breakers</td><td>"If two actions seem valid, choose the one with lower cost."</td></tr>
+<tr><td>Examples</td><td>2–5, ordered hardest-last</td><td>Include one abstain example</td></tr>
+<tr><td>Output schema</td><td>Machine-parsable</td><td>JSON with fixed keys and enum</td></tr>
+<tr><td>Fallback</td><td>What to do when unsure</td><td>"If the claim is unreadable, return action review."</td></tr>
+</tbody>
+</table>
+
+<h2>Few-shot example selection beats prompt wording</h2>
+<p>For a fixed budget of k examples, picking the <em>right</em> examples typically moves accuracy more than any
+phrasing change. Use similarity-based retrieval over an embedding index of labelled cases, and force class coverage:</p>
+<pre><code>import numpy as np
+
+def select_shots(q_vec, bank_vecs, bank_labels, k=4, per_class_min=1):
+    sims = bank_vecs @ q_vec / (np.linalg.norm(bank_vecs, axis=1) * np.linalg.norm(q_vec) + 1e-9)
+    order = np.argsort(-sims)
+    shots, seen = [], {}
+    for i in order:                                  # first pass: cover rare classes
+        lab = bank_labels[i]
+        if seen.get(lab, 0) &lt; per_class_min:
+            shots.append(i); seen[lab] = seen.get(lab, 0) + 1
+        if len(shots) == k:
+            return shots
+    for i in order:                                  # second pass: fill by similarity
+        if i not in shots:
+            shots.append(i)
+        if len(shots) == k:
+            break
+    return shots</code></pre>
+<p>Numbers worth knowing: random few-shot selection is usually 4–9 points worse than similarity-based selection on
+classification-style tasks, and adding a 5th example beyond k=5 typically gains under a point while adding ~20%
+prompt tokens.</p>
+
+<h2>Constrain the output, do not hope</h2>
+<p>Free-form JSON from a 360M model fails to parse on 2–8% of inputs. Two robust fixes:</p>
+<pre><code># 1. grammar-constrained decoding (outlines / llama.cpp grammars / vLLM guided decoding)
+from outlines import models, generate
+import outlines.grammars as g
+
+model = models.transformers("HuggingFaceTB/SmolLM2-360M-Instruct")
+choice = generate.choice(model, ["approve", "review", "decline"])
+action = choice(prompt)          # cannot emit anything outside the enum
+
+# 2. hard schema validation with an explicit abstain on failure
+import json, jsonschema
+try:
+    obj = json.loads(raw)
+    jsonschema.validate(obj, SCHEMA)
+except (json.JSONDecodeError, jsonschema.ValidationError):
+    obj = {"action": "review", "confidence": 0.0, "reason_code": "SCHEMA_FAIL"}</code></pre>
+<div class="callout tip"><b>Never retry-until-parseable in a decision path</b>
+Retry loops turn a 5% schema-failure rate into unbounded tail latency. Fail closed to the abstain action and log the
+raw output; that is both faster and auditable.</div>
+
+<h2>Chain-of-thought and self-consistency, priced honestly</h2>
+<p>CoT (Wei et al., 2022) helps multi-step tasks and hurts simple classification — on a narrow label task it adds
+tokens and variance for no accuracy gain. Self-consistency (Wang et al., 2023) samples k reasoning paths and takes a
+majority vote, typically +5 to +17 points on arithmetic benchmarks, but costs k× the inference:</p>
+<table>
+<thead><tr><th>Strategy</th><th>Latency (360M, CPU)</th><th>Relative cost</th><th>Accuracy effect on closed classification</th></tr></thead>
+<tbody>
+<tr><td>Direct label</td><td>~25 ms</td><td>1×</td><td>baseline</td></tr>
+<tr><td>Rationale then label</td><td>~90 ms</td><td>3–4×</td><td>−1 to +2 points; rationale is useful for audit</td></tr>
+<tr><td>Self-consistency k=5</td><td>~125 ms (batched)</td><td>5×</td><td>+0 to +3 points on classification</td></tr>
+<tr><td>Self-consistency k=5 + CoT</td><td>~450 ms</td><td>15×</td><td>+3 to +8 points on multi-hop tasks only</td></tr>
+</tbody>
+</table>
+<p>Latency figures are illustrative for a 360M INT8 model on 4 vCPU. The pattern is what matters: self-consistency is
+a batch-time optimisation, not a real-time one. Use it offline to build a high-quality label set for distillation,
+not in the request path.</p>
+
+<h2>Getting a probability out of a generative model</h2>
+<pre><code># Option A: verbalised confidence (cheap, poorly calibrated)
+prompt: '... reply {"action": ..., "confidence": 0.0-1.0}'
+
+# Option B: token logprob of the label token (better; needs logits access)
+ids = tok(prompt + ' "', return_tensors="pt").input_ids
+logits = model(ids).logits[0, -1]
+p = {a: torch.softmax(logits, -1)[tok.encode(' ' + a)[0]].item() for a in ACTIONS}
+p = {a: v / sum(p.values()) for a, v in p.items()}      # renormalise over the action set</code></pre>
+<p>Option B is consistently better calibrated than Option A and costs one forward pass. It is what you should feed into
+the cost-matrix argmax from <a href="02-decision-theory.html">chapter 02</a>. Still calibrate it — see
+<a href="../benchmarks/metrics.html">metrics</a>.</p>
+
+<h2>Prompt version control</h2>
+<p>A prompt is source code with a measurable effect on the decision. Keep prompts in files, hash them, and record the
+hash with every logged decision:</p>
+<pre><code>prompts/
+├── claims_triage/
+│   ├── v1.txt
+│   ├── v2.txt          # + reason codes, + abstain example
+│   └── CHANGELOG.md    # v2: macro-F1 0.81 -> 0.86, abstain 0.11 -> 0.09
+└── __init__.py         # load_prompt(name, version) with an sha256 in the manifest</code></pre>
+
+<h2>Prompt-level tests to run in CI</h2>
+<ul class="checklist">
+<li>Golden set of 200 inputs with expected actions: assert macro-F1 does not drop more than 1 point.</li>
+<li>Schema conformance: 100% of outputs parse and validate, or fall back to abstain.</li>
+<li>Abstain behaviour: out-of-scope inputs produce the abstain action at ≥ 90%.</li>
+<li>Injection resistance: an input containing "ignore previous instructions" does not change the action on 95% of
+cases.</li>
+<li>Token budget: p95 prompt tokens under the context limit with 10% headroom.</li>
+</ul>
+
+  <div class="pager"><a class="prev" href="../guides/05-finetuning.html"><span class="dir">Previous</span>05 · Fine-tuning</a><a class="next" href="../guides/07-hybrid-systems.html"><span class="dir">Next</span>07 · Hybrid systems</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hybrid systems · SLM Decision Models</title>
+<meta name="description" content="When one model call is not enough: retrieval, rules, tools, cascades and the escalation economics that justify them.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item active" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Guides / Hybrid systems</div>
+  <h1>Hybrid systems</h1>
+  <p class="subtitle">When one model call is not enough: retrieval, rules, tools, cascades and the escalation economics that justify them.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Pure-model decisions are rare in production. The systems that survive are hybrids: a cheap SLM for the bulk of
+traffic, deterministic rules for the cases rules handle better, retrieval for facts, a bigger model for the hard tail,
+and a human for what remains.</p>
+
+<h2>The canonical architecture</h2>
+<figure class="fig">
+<svg viewBox="0 0 860 260" role="img" aria-label="Hybrid decision architecture with rules, SLM, retrieval and escalation">
+  <defs><marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#8892a6"/></marker></defs>
+  <g font-family="system-ui,sans-serif" font-size="12.5">
+    <rect x="14" y="96" width="110" height="52" rx="9" fill="#eef1f8" stroke="#c9d0e2"/><text x="69" y="118" text-anchor="middle" font-weight="700">Input</text><text x="69" y="134" text-anchor="middle" fill="#5c6472">claim, txn, log</text>
+    <rect x="164" y="96" width="120" height="52" rx="9" fill="#fdf0e3" stroke="#e6bb8b"/><text x="224" y="118" text-anchor="middle" font-weight="700">Rules gate</text><text x="224" y="134" text-anchor="middle" fill="#5c6472">~35% decided</text>
+    <rect x="324" y="26" width="130" height="52" rx="9" fill="#e6f7f4" stroke="#8fd3c8"/><text x="389" y="48" text-anchor="middle" font-weight="700">Retrieval</text><text x="389" y="64" text-anchor="middle" fill="#5c6472">policy, history</text>
+    <rect x="324" y="96" width="130" height="52" rx="9" fill="#e6f7f4" stroke="#8fd3c8"/><text x="389" y="118" text-anchor="middle" font-weight="700">SLM policy</text><text x="389" y="134" text-anchor="middle" fill="#5c6472">~55% decided</text>
+    <rect x="324" y="176" width="130" height="52" rx="9" fill="#f2f3fe" stroke="#b9bcf3"/><text x="389" y="198" text-anchor="middle" font-weight="700">Tools</text><text x="389" y="214" text-anchor="middle" fill="#5c6472">price, KYC API</text>
+    <rect x="504" y="96" width="140" height="52" rx="9" fill="#fdeaea" stroke="#e8a9a9"/><text x="574" y="118" text-anchor="middle" font-weight="700">Escalate</text><text x="574" y="134" text-anchor="middle" fill="#5c6472">7B model / human</text>
+    <rect x="694" y="96" width="150" height="52" rx="9" fill="#eef1f8" stroke="#c9d0e2"/><text x="769" y="118" text-anchor="middle" font-weight="700">Action + log</text><text x="769" y="134" text-anchor="middle" fill="#5c6472">calibrated score</text>
+    <g stroke="#8892a6" stroke-width="1.4" marker-end="url(#a2)">
+      <line x1="124" y1="122" x2="160" y2="122"/><line x1="284" y1="122" x2="320" y2="122"/>
+      <line x1="454" y1="122" x2="500" y2="122"/><line x1="644" y1="122" x2="690" y2="122"/>
+      <line x1="389" y1="78" x2="389" y2="94"/><line x1="389" y1="150" x2="389" y2="174"/>
+    </g>
+    <text x="224" y="166" text-anchor="middle" fill="#a45a08" font-size="11.5">hard constraints</text>
+    <text x="574" y="166" text-anchor="middle" fill="#a51b1b" font-size="11.5">low confidence</text>
+  </g>
+</svg>
+<figcaption>A cascade: each stage handles the cases it is best at and forwards the rest. Percentages are illustrative
+for a claims workload; measure yours.</figcaption>
+</figure>
+
+<h2>The cascade, and its arithmetic</h2>
+<p>A cascade is worth building when the cost of the expensive path × escalation rate is less than the cost of running
+the expensive model on everything.</p>
+<pre><code>cost_cascade  = c_cheap + r · c_expensive
+cost_flat     = c_expensive
+
+# c_cheap = ₹0.002, c_expensive = ₹0.40, r = 0.12
+# cascade = 0.002 + 0.048 = ₹0.050  vs  ₹0.400 flat  → 8x cheaper
+# but latency: p50 25 ms, p95 25 + 600 = 625 ms — check your SLA tail</code></pre>
+<p>Escalate on any of: confidence below the cost-derived threshold, disagreement between two policies, schema
+failure, or an out-of-scope flag. Log the reason — escalation reasons are the best source of new training data.</p>
+
+<h2>Rules before models</h2>
+<p>Deterministic rules beat models on cases with a hard, legible constraint. Route those first:</p>
+<table>
+<thead><tr><th>Case</th><th>Rule</th><th>Why not the model</th></tr></thead>
+<tbody>
+<tr><td>Regulatory blacklist</td><td>Sanctions list match → decline</td><td>Must be explainable and 100% reproducible</td></tr>
+<tr><td>Amount thresholds</td><td>₹ &gt; 10L → manual review</td><td>Policy, not prediction</td></tr>
+<tr><td>Missing required fields</td><td>No invoice number → review</td><td>Deterministic data check</td></tr>
+<tr><td>Duplicate submission</td><td>Hash match → decline</td><td>Exact match beats inference</td></tr>
+</tbody>
+</table>
+<p>Rules also act as guardrails <em>after</em> the model: a model that approves a sanctioned entity is a compliance
+incident regardless of its accuracy.</p>
+
+<h2>Retrieval: give the SLM the facts it cannot know</h2>
+<pre><code>from slm_decision import Retriever, HybridPolicy
+
+retriever = Retriever(index="policy-index", embed_model="BAAI/bge-small-en-v1.5", top_k=3)
+policy = HybridPolicy(
+    spec=spec,
+    slm=slm_model,
+    retriever=retriever,
+    template="Policy excerpts:\n{context}\n\nCase:\n{query}\n\nAction?",
+    max_context_tokens=700,
+)</code></pre>
+<p>Keep the retrieved context under ~40% of the model's context window. Beyond that, small models attend to it worse,
+not better — a well-documented effect that shows up as accuracy falling while token count rises.</p>
+
+<h2>Tool calls from a small model</h2>
+<p>SLMs can call tools reliably if the tool set is small (≤ 5), the schema is flat, and there is exactly one call per
+step. ReAct-style multi-step tool use (Yao et al., 2022) at 360M parameters usually degrades into loops; cap the
+number of steps and add a hard timeout.</p>
+<pre><code>MAX_STEPS = 2
+for step in range(MAX_STEPS):
+    out = slm(scratchpad)
+    if out.is_final:
+        return out.action
+    result = tools[out.tool](**out.args)          # validated args, allow-listed tools
+    scratchpad += f"\nObservation: {result}"
+return ABSTAIN                                    # never loop past the cap</code></pre>
+
+<h2>Human-in-the-loop, as a designed action</h2>
+<p>Route to a human when: the cost of the mistake exceeds the reviewer cost, the case is out of distribution, or the
+decision is irreversible. Two design details matter more than the model:</p>
+<ul>
+<li><b>Give the reviewer the model's score and reason code</b>, not just the case. Reviewers who see a calibrated
+score agree with the model ~85% of the time and catch its errors faster.</li>
+<li><b>Measure the reviewer, not just the model.</b> Human accuracy on the escalated slice is usually lower than teams
+assume, and that number caps your achievable system accuracy.</li>
+</ul>
+
+<h2>When to stop adding components</h2>
+<p>Each stage adds a failure mode, a latency hop and an on-call surface. Stop when marginal cost reduction is below
+the operational cost of the stage — usually at two model calls plus one deterministic gate. Beyond that you are
+building a distributed system, and it will behave like one.</p>
+
+  <div class="pager"><a class="prev" href="../guides/06-prompt-engineering.html"><span class="dir">Previous</span>06 · Prompt engineering</a><a class="next" href="../code/py-slm-decision.html"><span class="dir">Next</span>Python library</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

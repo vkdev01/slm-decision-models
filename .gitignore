@@ -1,0 +1,39 @@
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.env
+
+# testing / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# notebooks
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# model artefacts and experiment output
+out/
+artifacts/
+*.onnx
+*.safetensors
+*.bin
+*.pt
+*.ckpt
+eval.json
+runs/
+wandb/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

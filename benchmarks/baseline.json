@@ -1,0 +1,121 @@
+{
+  "generated_at": "2026-11-03T15:44:01+00:00",
+  "python": "3.12.13",
+  "platform": "Linux-4.19.0-gvisor-x86_64-with-glibc2.36",
+  "n": 6000,
+  "seed": 0,
+  "temperature": 3.1251,
+  "accuracy": 0.5467,
+  "macro_f1": 0.4311,
+  "cost_per_case": 11.36,
+  "abstain_rate": 0.0,
+  "ece": 0.0204,
+  "p95_ms": 23.897,
+  "p95_ms_scope": "policy layer only",
+  "policies": {
+    "rule@0.5 (raw)": {
+      "policy": "loan_triage",
+      "n": 3000,
+      "accuracy": 0.677,
+      "macro_f1": 0.6769982414348701,
+      "cost_per_case": 23.496,
+      "abstain_rate": 0.0,
+      "coverage": 1.0,
+      "ece": 0.16095899519581652,
+      "brier": 0.23495724446217922,
+      "coverage_at_5pct_risk": 0.0003333333333333333,
+      "action_mix": {
+        "approve": 0.5013333333333333,
+        "decline": 0.49866666666666665
+      },
+      "per_class": {
+        "approve": {
+          "recall": 0.6796507723304231,
+          "support": 1489.0
+        },
+        "decline": {
+          "recall": 0.6743878226340172,
+          "support": 1511.0
+        }
+      }
+    },
+    "rule@0.5 (calibrated)": {
+      "policy": "loan_triage",
+      "n": 3000,
+      "accuracy": 0.677,
+      "macro_f1": 0.6769982414348701,
+      "cost_per_case": 23.496,
+      "abstain_rate": 0.0,
+      "coverage": 1.0,
+      "ece": 0.02037378218745984,
+      "brier": 0.20554887025938023,
+      "coverage_at_5pct_risk": 0.0003333333333333333,
+      "action_mix": {
+        "approve": 0.5013333333333333,
+        "decline": 0.49866666666666665
+      },
+      "per_class": {
+        "approve": {
+          "recall": 0.6796507723304231,
+          "support": 1489.0
+        },
+        "decline": {
+          "recall": 0.6743878226340172,
+          "support": 1511.0
+        }
+      }
+    },
+    "cost-optimal (raw)": {
+      "policy": "loan_triage",
+      "n": 3000,
+      "accuracy": 0.648,
+      "macro_f1": 0.6335362456713782,
+      "cost_per_case": 16.16,
+      "abstain_rate": 0.0,
+      "coverage": 1.0,
+      "ece": 0.16095899519581652,
+      "brier": 0.23495724446217922,
+      "coverage_at_5pct_risk": 0.0003333333333333333,
+      "action_mix": {
+        "approve": 0.305,
+        "decline": 0.695
+      },
+      "per_class": {
+        "approve": {
+          "recall": 0.4526527871054399,
+          "support": 1489.0
+        },
+        "decline": {
+          "recall": 0.8405029781601588,
+          "support": 1511.0
+        }
+      }
+    },
+    "cost-optimal (calibrated)": {
+      "policy": "loan_triage",
+      "n": 3000,
+      "accuracy": 0.5466666666666666,
+      "macro_f1": 0.431128640776699,
+      "cost_per_case": 11.36,
+      "abstain_rate": 0.0,
+      "coverage": 1.0,
+      "ece": 0.02037378218745984,
+      "brier": 0.20554887025938023,
+      "coverage_at_5pct_risk": 0.0003333333333333333,
+      "action_mix": {
+        "approve": 0.053,
+        "decline": 0.947
+      },
+      "per_class": {
+        "approve": {
+          "recall": 0.09670920080591,
+          "support": 1489.0
+        },
+        "decline": {
+          "recall": 0.9900727994705493,
+          "support": 1511.0
+        }
+      }
+    }
+  }
+}

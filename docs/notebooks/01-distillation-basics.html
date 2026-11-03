@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NB1 · Distillation basics · SLM Decision Models</title>
+<meta name="description" content="Train a small student to imitate a teacher's label distribution, and measure how much agreement you actually bought.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item active" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Notebooks / NB1 · Distillation basics</div>
+  <h1>NB1 · Distillation basics</h1>
+  <p class="subtitle">Train a small student to imitate a teacher's label distribution, and measure how much agreement you actually bought.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p><b>File:</b> <code>notebooks/01-distillation-basics.ipynb</code> · <b>Runtime:</b> ~4 min CPU ·
+<b>Data:</b> synthetic 6-class intent set generated in-notebook (no downloads).</p>
+
+<h2>What it does</h2>
+<ol>
+<li>Builds a toy "teacher" that is a hand-written scoring function over synthetic text features — so the notebook runs
+with zero downloads and still has non-trivial soft targets.</li>
+<li>Generates 8,000 training and 2,000 held-out examples with teacher distributions.</li>
+<li>Trains two students on identical data: one on hard labels, one on soft targets with T = 4, α = 0.3.</li>
+<li>Plots the accuracy-vs-data-size curve for both, showing the label-efficiency gap.</li>
+</ol>
+
+<h2>Key cells</h2>
+<pre><code># 1 · teacher distribution over 6 intents, temperature-sharpened
+def teacher_probs(text, T=1.0):
+    z = np.array([score_intent(text, k) for k in range(6)])
+    e = np.exp(z / T)
+    return e / e.sum()
+
+# 2 · the two students differ only in the loss
+loss_hard = F.cross_entropy(student_logits, labels)
+loss_soft = F.kl_div(F.log_softmax(student_logits / 4, -1), teacher_p, reduction="batchmean") * 16
+loss = 0.3 * loss_hard + 0.7 * loss_soft
+
+# 3 · label-efficiency sweep
+for n in [100, 250, 500, 1000, 2000, 4000, 8000]:
+    acc_hard[n] = train_eval(n, mode="hard")
+    acc_soft[n] = train_eval(n, mode="soft")</code></pre>
+
+<h2>Expected output</h2>
+<pre><code>n_train   hard-label acc   soft-target acc   gap
+100       0.399            0.604             0.205
+500       0.522            0.658             0.136
+2000      0.614            0.664             0.050
+8000      0.650            0.660             0.010
+
+agreement with teacher (n=8000):  hard 0.822  |  soft 0.836
+teacher accuracy on the test split: 0.621</code></pre>
+<p class="mono" style="font-size:12.5px;color:#5c6472">Numbers from a CPU run of the committed notebook with seed 0.
+Your run will differ slightly; the ordering and the shrinking gap at large n are the point.</p>
+
+<h2>What to take away</h2>
+<ul>
+<li>The soft-target advantage is largest when data is scarce — 20 points at n=100, 1 point at n=8000. Distillation
+is a data-efficiency technique as much as a compression one.</li>
+<li>The gap never fully closes: the student learns the teacher's boundary, not its exact distribution. Expect ~82–86%
+agreement here, not 100% — the teacher is deliberately non-linear so the linear student cannot match it exactly.</li>
+<li>Temperature barely moves the argmax in this setup. That is the honest result, and the reason the notebook includes
+the sweep: measure T on your own task instead of copying a canonical value. It matters most when the student is
+capacity-limited or when you need the probabilities, not just the label.</li>
+</ul>
+
+<h2>Run it</h2>
+<pre><code>jupyter lab notebooks/01-distillation-basics.ipynb
+# or headless:
+jupyter nbconvert --to notebook --execute notebooks/01-distillation-basics.ipynb \
+  --output /tmp/nb1.ipynb</code></pre>
+
+  <div class="pager"><a class="prev" href="../code/py-slm-decision.html"><span class="dir">Previous</span>Python library</a><a class="next" href="../notebooks/02-finetuning-medical.html"><span class="dir">Next</span>NB2 · Medical triage</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

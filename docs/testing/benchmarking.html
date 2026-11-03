@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Benchmarking · SLM Decision Models</title>
+<meta name="description" content="Latency, throughput and cost measured honestly — plus the harness that keeps your numbers comparable across runs.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item active" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Testing / Benchmarking</div>
+  <h1>Benchmarking</h1>
+  <p class="subtitle">Latency, throughput and cost measured honestly — plus the harness that keeps your numbers comparable across runs.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Benchmark claims decay fast and are easy to fake accidentally. This chapter is about measuring so that two runs a
+month apart are comparable: same harness, same warm-up, same reporting shape.</p>
+
+<h2>What to measure</h2>
+<table>
+<thead><tr><th>Metric</th><th>Definition</th><th>Why it matters</th></tr></thead>
+<tbody>
+<tr><td>p50 / p95 / p99 latency</td><td>Per-request wall time, warm</td><td>The p99 is what your SLA is written against</td></tr>
+<tr><td>Throughput</td><td>Requests per second at fixed concurrency</td><td>Sizing and cost per case</td></tr>
+<tr><td>Time to first token</td><td>Generation models only</td><td>Dominates perceived latency in interactive use</td></tr>
+<tr><td>Peak RSS</td><td>Resident memory after warm-up</td><td>Container sizing, edge fit</td></tr>
+<tr><td>Cold start</td><td>Load + first inference</td><td>Autoscaling and serverless viability</td></tr>
+<tr><td>Energy (optional)</td><td>Joules per 1k decisions</td><td>Edge and battery-powered deployments</td></tr>
+</tbody>
+</table>
+
+<h2>Harness rules</h2>
+<ol>
+<li><b>Warm up.</b> Run 20 requests and discard them. First-call latency includes allocator and cache effects that
+never recur.</li>
+<li><b>Fix the input distribution.</b> Benchmark on your real length distribution, not on 128-token sentences, unless
+you say so.</li>
+<li><b>Batch honestly.</b> Batch-1 latency and batch-32 throughput are different products. Report both, labelled.</li>
+<li><b>Pin the environment.</b> Threads (<code>OMP_NUM_THREADS</code>), quantisation, dtype, and the exact commit.</li>
+<li><b>Repeat.</b> Three runs, report the median of the p95s, and note the spread.</li>
+</ol>
+
+<h2>Minimal harness</h2>
+<pre><code>import time, statistics, numpy as np, torch
+
+def benchmark(fn, inputs, warmup=20, repeat=3):
+    for x in inputs[:warmup]:
+        fn(x)
+    runs = []
+    for _ in range(repeat):
+        ts = []
+        for x in inputs:
+            t0 = time.perf_counter(); fn(x); ts.append((time.perf_counter() - t0) * 1000)
+        runs.append({"p50": np.percentile(ts, 50), "p95": np.percentile(ts, 95),
+                     "p99": np.percentile(ts, 99), "mean": statistics.mean(ts)})
+    return {k: statistics.median([r[k] for r in runs]) for k in runs[0]}
+
+torch.set_num_threads(4)
+res = benchmark(lambda t: model.decide(t), sample_texts)
+print({k: round(v, 1) for k, v in res.items()})</code></pre>
+
+<h2>Reference latency table</h2>
+<p>Illustrative figures for a 360M decoder and a 66M encoder, batch 1, 4 vCPU, 256 input tokens, INT8. Measure your own;
+the ratios are the transferable part.</p>
+<table>
+<thead><tr><th>Model</th><th>Hardware</th><th>p50</th><th>p95</th><th>Throughput</th><th>Peak RSS</th></tr></thead>
+<tbody>
+<tr><td>66M encoder, classification</td><td>4 vCPU</td><td>4 ms</td><td>9 ms</td><td>~230 req/s</td><td>310 MB</td></tr>
+<tr><td>66M encoder, classification</td><td>Raspberry Pi 4</td><td>38 ms</td><td>61 ms</td><td>~24 req/s</td><td>290 MB</td></tr>
+<tr><td>360M decoder, 1 label token</td><td>4 vCPU</td><td>24 ms</td><td>41 ms</td><td>~40 req/s</td><td>520 MB</td></tr>
+<tr><td>360M decoder, 32 generated tokens</td><td>4 vCPU</td><td>210 ms</td><td>380 ms</td><td>~4.5 req/s</td><td>540 MB</td></tr>
+<tr><td>360M decoder, 32 tokens</td><td>1× T4 GPU</td><td>55 ms</td><td>78 ms</td><td>~110 req/s</td><td>1.1 GB</td></tr>
+<tr><td>1.7B decoder, 32 tokens</td><td>1× T4 GPU</td><td>190 ms</td><td>260 ms</td><td>~32 req/s</td><td>3.4 GB</td></tr>
+</tbody>
+</table>
+<div class="callout warn"><b>Generation dominates</b>
+Note the jump from 24 ms to 210 ms when the model must emit 32 tokens instead of one. If your decision fits in a
+single label token, force it — the latency difference is larger than any quantisation gain.</div>
+
+<h2>Accuracy benchmarking</h2>
+<pre><code>from slm_decision import evaluate_policy
+
+rows = []
+for name, policy in [("rules", rule_policy), ("slm-360m", slm_policy), ("cascade", cascade)]:
+    r = evaluate_policy(spec, policy, y_true=y_test, scores=p_test)
+    rows.append({"policy": name, **r.to_dict()})
+
+pd.DataFrame(rows)[["policy","accuracy","macro_f1","cost_per_case","abstain_rate","ece"]]</code></pre>
+<p>Report cost per case alongside accuracy in every table. A policy that is 3 points less accurate but halves cost per
+case is usually the right choice, and the table should make that visible without a footnote.</p>
+
+<h2>Regression gates for CI</h2>
+<table>
+<thead><tr><th>Gate</th><th>Threshold</th><th>Action on failure</th></tr></thead>
+<tbody>
+<tr><td>Macro-F1 vs baseline</td><td>−1.0 point</td><td>Fail the build</td></tr>
+<tr><td>p95 latency</td><td>+20% vs main</td><td>Fail the build</td></tr>
+<tr><td>Peak RSS</td><td>+15% vs main</td><td>Warn, fail above +30%</td></tr>
+<tr><td>Abstain rate</td><td>outside [0.8×, 1.2×] of baseline</td><td>Fail — it usually means a threshold or prompt bug</td></tr>
+<tr><td>ECE</td><td>&gt; 0.05 after calibration</td><td>Fail</td></tr>
+</tbody>
+</table>
+<p>Benchmark results belong in the repo, dated, next to the model artefact. A latency claim with no date, hardware
+description and commit hash is folklore.</p>
+
+  <div class="pager"><a class="prev" href="../testing/edge-cases.html"><span class="dir">Previous</span>Edge cases</a><a class="next" href="../deployment/docker.html"><span class="dir">Next</span>Docker</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

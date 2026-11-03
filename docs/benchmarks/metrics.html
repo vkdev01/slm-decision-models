@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance metrics · SLM Decision Models</title>
+<meta name="description" content="Definitions, formulas and thresholds for the metrics that actually decide whether a decision model ships.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item active" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Benchmarks / Performance metrics</div>
+  <h1>Performance metrics</h1>
+  <p class="subtitle">Definitions, formulas and thresholds for the metrics that actually decide whether a decision model ships.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>There are dozens of metrics available and about eight that matter. Each one below answers a question a stakeholder
+will ask, so each one belongs in the release report.</p>
+
+<h2>The core eight</h2>
+<table>
+<thead><tr><th>Metric</th><th>Formula / definition</th><th>Answers</th><th>Gate</th></tr></thead>
+<tbody>
+<tr><td>Macro-F1</td><td>Unweighted mean of per-class F1</td><td>Are all classes working, including rare ones?</td><td>Within 1 point of baseline</td></tr>
+<tr><td>Cost per case</td><td>$$mean(c(a_i, y_i))$$</td><td>What does a decision cost in money?</td><td>Below current process</td></tr>
+<tr><td>Abstain rate</td><td>Fraction routed to the abstain action</td><td>Can operations absorb the load?</td><td>Inside the capacity plan</td></tr>
+<tr><td>Coverage at fixed risk</td><td>Fraction auto-decided while error ≤ target</td><td>How much can we automate safely?</td><td>≥ planned coverage</td></tr>
+<tr><td>ECE</td><td>$$Σ_b (|B_b| / n) · |acc(B_b) − conf(B_b)|$$</td><td>Can thresholds be trusted?</td><td>≤ 0.05</td></tr>
+<tr><td>Brier score</td><td>$$mean((p - y)^2)$$</td><td>Overall probability quality (proper rule)</td><td>Improves vs baseline</td></tr>
+<tr><td>p95 latency</td><td>95th percentile of decision time</td><td>Does it meet the SLA?</td><td>Within budget</td></tr>
+<tr><td>Severe-miss rate</td><td>Fraction of the worst outcome class handled by the safest action</td><td>The one number that can veto a launch</td><td>Set by the domain owner</td></tr>
+</tbody>
+</table>
+
+<h2>Calibration, in practice</h2>
+<pre><code>import numpy as np
+
+def ece(p, y, n_bins=15):
+    bins = np.linspace(0, 1, n_bins + 1)
+    idx = np.digitize(p, bins) - 1
+    total = 0.0
+    for b in range(n_bins):
+        m = idx == b
+        if m.sum() == 0:
+            continue
+        total += m.mean() * abs(y[m].mean() - p[m].mean())
+    return total
+
+def brier(p, y):
+    return float(np.mean((p - y) ** 2))</code></pre>
+<p>Reading an ECE: 0.03 is good, 0.05 is acceptable for most business decisions, 0.10 means your thresholds are
+effectively arbitrary, and above 0.15 the probability output should not be used for cost arithmetic at all.</p>
+
+<h2>Risk-coverage: the curve to show a product owner</h2>
+<pre><code>def risk_coverage(p, y, preds):
+    order = np.argsort(-p)                       # most confident first
+    cov, risk, errs = [], [], 0
+    for i, k in enumerate(order, start=1):
+        errs += int(preds[k] != y[k])
+        cov.append(i / len(p))
+        risk.append(errs / i)
+    return np.array(cov), np.array(risk)</code></pre>
+<table>
+<thead><tr><th>Coverage</th><th>Error on covered</th><th>Interpretation</th></tr></thead>
+<tbody>
+<tr><td>0.50</td><td>0.021</td><td>Auto-decide half, near-perfect</td></tr>
+<tr><td>0.71</td><td>0.050</td><td>Typical operating point for a 5% error budget</td></tr>
+<tr><td>0.85</td><td>0.094</td><td>Error roughly doubles for 14 more points of automation</td></tr>
+<tr><td>1.00</td><td>0.158</td><td>The model's raw accuracy — usually unacceptable alone</td></tr>
+</tbody>
+</table>
+<p>This table is the single most useful artefact in a launch review: it converts "how accurate is the model" into "how
+much can we automate at a risk level we accept".</p>
+
+<h2>Cost metrics</h2>
+<pre><code>cost_per_case   = mean over cases of cost(action_i, y_i)
+cost_savings    = (cost_baseline - cost_model) * volume
+regret          = mean over cases of (best_possible_cost - realised_cost)
+break_even_vol  = build_cost / (cost_baseline - cost_model)   # cases needed to pay back</code></pre>
+<p>Report regret alongside cost: it bounds how much better any future model could be on the same cases, which is the
+number that tells you whether to keep investing.</p>
+
+<h2>Latency metrics that predict incidents</h2>
+<table>
+<thead><tr><th>Metric</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>p50</td><td>Baseline health; slow drift here precedes tail failures</td></tr>
+<tr><td>p99</td><td>The number in the SLA</td></tr>
+<tr><td>p99/p50 ratio</td><td>Above ~8 suggests retries, GC pauses or queueing</td></tr>
+<tr><td>Timeout rate</td><td>Directly produces abstentions, which load reviewers</td></tr>
+<tr><td>Cold-start count</td><td>Each one is a multi-second user-visible stall</td></tr>
+</tbody>
+</table>
+
+<h2>What not to lead with</h2>
+<p>Accuracy on an imbalanced set, AUC on a decision you take at a fixed threshold, and average confidence are all
+seductive and none of them decides a launch. Accuracy hides class collapse; AUC is threshold-free while your product
+is not; average confidence says nothing about correctness. Keep them in the appendix.</p>
+
+  <div class="pager"><a class="prev" href="../deployment/cicd.html"><span class="dir">Previous</span>CI/CD</a><a class="next" href="../benchmarks/comparison.html"><span class="dir">Next</span>Model comparison</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

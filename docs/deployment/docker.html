@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker · SLM Decision Models</title>
+<meta name="description" content="A small, reproducible image: multi-stage build, non-root, health checks, and a model baked in or mounted.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item active" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Deployment / Docker</div>
+  <h1>Docker</h1>
+  <p class="subtitle">A small, reproducible image: multi-stage build, non-root, health checks, and a model baked in or mounted.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>The deployment goal is a container that starts in seconds, serves a decision in milliseconds, and fails predictably.
+That means a slim base, a baked artefact, a warm-up on start, and a health check that reflects readiness rather than
+liveness.</p>
+
+<h2>Dockerfile</h2>
+<pre><code># ---- build stage ----
+FROM python:3.12-slim AS build
+WORKDIR /app
+COPY requirements.txt code/ ./
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt \
+ &amp;&amp; pip install --no-cache-dir --prefix=/install ./code
+
+# ---- runtime stage ----
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    OMP_NUM_THREADS=4 TOKENIZERS_PARALLELISM=false
+RUN useradd -m -u 10001 app
+WORKDIR /app
+COPY --from=build /install /usr/local
+COPY src/ /app/src/
+COPY artifacts/slm-360m-int8/ /app/artifacts/slm-360m-int8/
+USER app
+EXPOSE 8000
+HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=3 \
+  CMD python -c "import urllib.request;urllib.request.urlopen('http://localhost:8000/ready')"
+CMD ["uvicorn", "src.serve:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]</code></pre>
+
+<h2>Why each choice</h2>
+<table>
+<thead><tr><th>Choice</th><th>Reason</th></tr></thead>
+<tbody>
+<tr><td><code>python:3.12-slim</code></td><td>~130 MB base; torch CPU wheels add ~800 MB, so the base is not the problem — the wheels are</td></tr>
+<tr><td>Multi-stage</td><td>Keeps compilers out of the runtime image; typically 300–500 MB smaller</td></tr>
+<tr><td>Non-root user</td><td>Required by most cluster policies and by any serious security review</td></tr>
+<tr><td>Baked artefact</td><td>No network fetch at start — deterministic start time and no registry dependency at runtime</td></tr>
+<tr><td>1 worker</td><td>The model is in-process; multiple workers multiply memory. Scale with replicas, not workers</td></tr>
+<tr><td><code>/ready</code> vs <code>/health</code></td><td>Readiness must include "model loaded and warm", not just "process alive"</td></tr>
+</tbody>
+</table>
+
+<h2>Serving app</h2>
+<pre><code>from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from slm_decision import SLMDecisionModel, DecisionSpec
+
+app = FastAPI(title="slm-decision")
+model = None
+
+@app.on_event("startup")
+def load():
+    global model, spec
+    spec = DecisionSpec.load("artifacts/spec.json")
+    model = SLMDecisionModel.from_pretrained("artifacts/slm-360m-int8", device="cpu")
+    model.warmup(n=5)                      # pay allocator costs before traffic arrives
+
+class Req(BaseModel):
+    text: str
+
+@app.post("/decide")
+def decide(req: Req):
+    if not req.text.strip():
+        return {"action": spec.abstain, "confidence": 0.0, "reason_code": "EMPTY"}
+    r = model.decide(req.text)
+    return {"action": r.action, "confidence": r.confidence,
+            "reason_code": r.reason_code, "model": model.version}
+
+@app.get("/ready")
+def ready():
+    if model is None:
+        raise HTTPException(503, "model not loaded")
+    return {"status": "ready", "model": model.version}</code></pre>
+
+<h2>Resource sizing</h2>
+<pre><code># docker-compose.yml
+services:
+  slm:
+    build: .
+    ports: ["8000:8000"]
+    deploy:
+      resources:
+        limits:   { cpus: "2", memory: "1.5G" }
+        reservations: { memory: "800M" }
+    environment:
+      OMP_NUM_THREADS: "2"
+    read_only: true
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges:true"]</code></pre>
+<p>A 360M INT8 model peaks around 520 MB RSS at batch 1. Budget 2.5–3× the weights for the container limit so that
+concurrency spikes and the tokenizer do not trigger OOM kills.</p>
+
+<h2>Image size expectations</h2>
+<table>
+<thead><tr><th>Contents</th><th>Approximate size</th></tr></thead>
+<tbody>
+<tr><td>python:3.12-slim base</td><td>130 MB</td></tr>
+<tr><td>torch CPU wheel</td><td>750–900 MB</td></tr>
+<tr><td>transformers + tokenizers + deps</td><td>90 MB</td></tr>
+<tr><td>360M INT8 artefact</td><td>360 MB</td></tr>
+<tr><td>Application code</td><td>&lt; 1 MB</td></tr>
+<tr><td><b>Total</b></td><td><b>~1.4 GB</b></td></tr>
+</tbody>
+</table>
+<p>If that is too large, the biggest lever is not <code>slim</code> — it is dropping torch in favour of ONNX Runtime
+(~180 MB), which is also usually 1.3–2× faster on CPU for small models. See
+<a href="edge.html">edge deployment</a>.</p>
+
+<h2>Smoke test before you ship the image</h2>
+<pre><code>docker build -t slm-decision:local .
+docker run --rm -p 8000:8000 slm-decision:local &amp;
+sleep 5
+curl -s localhost:8000/ready
+curl -s -X POST localhost:8000/decide -H 'content-type: application/json' \
+  -d '{"text":"Claim denied without reason; policy 4.2 requires one."}'
+docker stats --no-stream slm-decision:local</code></pre>
+
+  <div class="pager"><a class="prev" href="../testing/benchmarking.html"><span class="dir">Previous</span>Benchmarking</a><a class="next" href="../deployment/cloud.html"><span class="dir">Next</span>Cloud</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

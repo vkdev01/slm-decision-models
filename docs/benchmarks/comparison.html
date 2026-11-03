@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model comparison · SLM Decision Models</title>
+<meta name="description" content="How SLMs compare with each other, with frontier APIs and with non-neural baselines — on decision metrics, not benchmarks.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item active" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Benchmarks / Model comparison</div>
+  <h1>Model comparison</h1>
+  <p class="subtitle">How SLMs compare with each other, with frontier APIs and with non-neural baselines — on decision metrics, not benchmarks.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>The useful comparison is not "which model scores highest on MMLU". It is "which model gives the lowest cost per
+case at my latency budget and my abstain capacity". Those are different questions with different winners.</p>
+
+<h2>Baselines you must include</h2>
+<ol>
+<li><b>Majority class.</b> Establishes the floor. If your model does not beat it by 10 points, something is broken.</li>
+<li><b>TF-IDF + logistic regression.</b> Absurdly strong on text classification; frequently within 2–5 points of a
+fine-tuned transformer at 1/1000th the cost.</li>
+<li><b>Gradient boosting on engineered features.</b> The incumbent in most enterprises.</li>
+<li><b>Frontier API with a good prompt.</b> The quality ceiling and the cost comparison.</li>
+</ol>
+<div class="callout"><b>If the SLM does not beat the logistic baseline, ship the logistic baseline</b>
+This happens more often than vendors would like. It is a success — you saved a year of model maintenance.</div>
+
+<h2>Comparison table</h2>
+<p>Illustrative results on a 12-class support-ticket routing task, 20k training examples, 4k test. Replace with your
+own numbers from <code>benchmarks/evaluate.py</code>.</p>
+<table>
+<thead><tr><th>Model</th><th>Macro-F1</th><th>Cost/case</th><th>p95 latency</th><th>Memory</th><th>Trainable on</th></tr></thead>
+<tbody>
+<tr><td>Majority class</td><td>0.09</td><td>14.2</td><td>&lt; 1 ms</td><td>—</td><td>—</td></tr>
+<tr><td>TF-IDF + logistic</td><td>0.74</td><td>6.1</td><td>2 ms</td><td>40 MB</td><td>CPU, seconds</td></tr>
+<tr><td>66M encoder (fine-tuned)</td><td>0.83</td><td>4.0</td><td>9 ms</td><td>310 MB</td><td>1 GPU-hour</td></tr>
+<tr><td>360M decoder (distilled)</td><td>0.86</td><td>3.6</td><td>41 ms</td><td>520 MB</td><td>6 GPU-hours</td></tr>
+<tr><td>1.7B decoder (distilled)</td><td>0.87</td><td>3.5</td><td>140 ms</td><td>1.9 GB</td><td>1 GPU-day</td></tr>
+<tr><td>Frontier API (prompted)</td><td>0.88</td><td>3.4</td><td>900 ms</td><td>—</td><td>—</td></tr>
+</tbody>
+</table>
+<p class="mono" style="font-size:12.5px;color:#5c6472">Illustrative. The pattern to expect: most of the gain arrives by
+66M; the frontier API adds ~2 points of F1 over a distilled 360M model at 20× the latency and materially higher cost.</p>
+
+<h2>Reading that table honestly</h2>
+<ul>
+<li><b>0.74 → 0.83 is the big jump.</b> Almost all the value of "using a transformer" is captured by the smallest
+model in the list.</li>
+<li><b>0.83 → 0.88 is diminishing.</b> Ask what those 5 points are worth in cost terms before paying 20× latency.</li>
+<li><b>Cost per case, not F1, orders the last four rows.</b> A 1.7B model is not worth 3× the latency for 1 point of F1
+on a routing task.</li>
+</ul>
+
+<h2>Choosing under constraints</h2>
+<table>
+<thead><tr><th>Constraint</th><th>Pick</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>p99 &lt; 50 ms</td><td>66M encoder, INT8, ONNX</td><td>Decoders cannot generate in that budget</td></tr>
+<tr><td>Must run on a Pi</td><td>22M–66M encoder, INT8</td><td>Memory, not compute, is the limit</td></tr>
+<tr><td>Input is 4k tokens</td><td>360M–1.7B decoder with 8k context</td><td>Encoders cap at 512 tokens</td></tr>
+<tr><td>Needs a reason string</td><td>360M decoder with constrained JSON</td><td>Classification heads cannot explain</td></tr>
+<tr><td>Zero training data</td><td>Frontier API, then distil</td><td>Bootstrapping problem, not a model problem</td></tr>
+<tr><td>Regulated, no third parties</td><td>Self-hosted 360M</td><td>Data residency and audit</td></tr>
+</tbody>
+</table>
+
+<h2>Comparing like for like</h2>
+<pre><code># the only fair comparison: same spec, same split, same policy class
+from slm_decision import evaluate_policy, CostOptimalPolicy
+
+rows = []
+for name, proba in scores_by_model.items():
+    policy = CostOptimalPolicy(spec, max_abstain_rate=0.25)
+    r = evaluate_policy(spec, policy, y_true=y_test, probs=proba)
+    rows.append({"model": name, **r.to_dict()})</code></pre>
+<p>Keep the policy and the abstain cap fixed across models, otherwise you are comparing policies, not models. Then vary
+one axis at a time — accuracy, latency, memory — and record the hardware.</p>
+
+<h2>Distillation ladder</h2>
+<p>A practical sequence that avoids over-building: logistic baseline → 66M encoder → distill the best available teacher
+into 360M → stop. Each rung should be justified by a measured gain in cost per case, not by a benchmark leaderboard.</p>
+
+  <div class="pager"><a class="prev" href="../benchmarks/metrics.html"><span class="dir">Previous</span>Metrics</a><a class="next" href="../benchmarks/optimization.html"><span class="dir">Next</span>Optimization</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

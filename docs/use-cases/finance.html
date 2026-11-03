@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Finance · SLM Decision Models</title>
+<meta name="description" content="Fraud, credit and KYC decisions under hard latency budgets and an auditor who will ask why.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item active" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Use cases / Finance</div>
+  <h1>Finance</h1>
+  <p class="subtitle">Fraud, credit and KYC decisions under hard latency budgets and an auditor who will ask why.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Finance is the best-documented commercial home for SLM decision models: high volume, closed label sets, asymmetric
+costs, strict latency and a regulator who wants explanations. All five of those push toward small, self-hosted,
+deterministic models.</p>
+
+<h2>Decision inventory</h2>
+<table>
+<thead><tr><th>Decision</th><th>Actions</th><th>Latency budget</th><th>SLM fit</th></tr></thead>
+<tbody>
+<tr><td>Card transaction scoring</td><td>approve · step-up · block</td><td>&lt; 50 ms p99</td><td>Poor alone — SLM enriches a gradient-boosted model's features</td></tr>
+<tr><td>KYC document consistency</td><td>pass · manual · reject</td><td>&lt; 2 s</td><td>Excellent — extraction + consistency check</td></tr>
+<tr><td>Loan application narrative</td><td>auto · review · decline</td><td>&lt; 800 ms</td><td>Good — combine with bureau features</td></tr>
+<tr><td>Dispute / chargeback triage</td><td>auto-resolve · investigate · escalate</td><td>&lt; 5 s</td><td>Excellent — text-heavy, cost-asymmetric</td></tr>
+<tr><td>Adverse-media screening</td><td>clear · flag · escalate</td><td>batch</td><td>Good — recall matters more than precision</td></tr>
+</tbody>
+</table>
+
+<h2>The cost matrix is the model</h2>
+<pre><code>spec = DecisionSpec(
+    name="chargeback_triage",
+    actions=["auto_resolve", "investigate", "escalate"],
+    costs={
+        ("auto_resolve", "fraudulent"): 45_000,   # paid out on fraud
+        ("auto_resolve", "legitimate"): 0,
+        ("investigate",  "fraudulent"): 1_200,    # analyst hour
+        ("investigate",  "legitimate"): 1_200,
+        ("escalate",     "fraudulent"): 6_500,    # senior + legal
+        ("escalate",     "legitimate"): 6_500,
+    },
+    abstain="investigate", max_abstain_rate=0.35,
+)</code></pre>
+<p>With a 37:1 ratio between a bad auto-resolve and an investigation, the optimal policy investigates anything above
+~2.6% fraud probability — a far wider band than intuition suggests. Publishing that derivation is what makes the
+policy defensible in an audit.</p>
+
+<h2>Reference numbers</h2>
+<table>
+<thead><tr><th>Metric</th><th>Manual baseline</th><th>SLM-assisted</th></tr></thead>
+<tbody>
+<tr><td>Cases auto-decided</td><td>0%</td><td>62%</td></tr>
+<tr><td>Cost per case</td><td>₹1,200</td><td>₹470</td></tr>
+<tr><td>Fraud leakage (bad auto-resolves)</td><td>—</td><td>0.7% of fraud cases</td></tr>
+<tr><td>Analyst throughput</td><td>~90 cases/day</td><td>~140 cases/day (pre-sorted queue)</td></tr>
+<tr><td>p95 latency</td><td>n/a</td><td>310 ms</td></tr>
+</tbody>
+</table>
+<p class="mono" style="font-size:12.5px;color:#5c6472">Illustrative. Every regulated deployment needs model risk
+management sign-off, ongoing validation and documented limits.</p>
+
+<h2>Explainability that satisfies a reviewer</h2>
+<p>Not SHAP waterfalls — reviewers want the specific evidence. Make the SLM emit a reason code from a closed set and
+store the evidence spans:</p>
+<pre><code>{"action": "investigate",
+ "confidence": 0.68,
+ "reason_code": "R7",                 # R7 = merchant category mismatch
+ "evidence": ["MCC 5999 vs stated 5411", "3 prior disputes in 90 days"],
+ "model": "slm-360m-chargeback@v4", "prompt_hash": "9f2c…", "calib_T": 1.31}</code></pre>
+
+<h2>Fairness and adverse action</h2>
+<p>A decline is an adverse action. In most jurisdictions it requires a stated reason, and in India, RBI's digital
+lending and fair-practices directions constrain automated decisioning. Practical controls:</p>
+<ul class="checklist">
+<li>Never let the SLM see protected attributes directly; test for disparate impact on proxy variables.</li>
+<li>Track approval rate by slice monthly, with a documented threshold for investigation (e.g. ±5 points).</li>
+<li>Keep a counterfactual review set: 2% of auto-decisions are human-reviewed regardless of score.</li>
+<li>Retain inputs, scores and decisions for the statutory period — often 5–8 years.</li>
+</ul>
+
+<h2>Latency engineering</h2>
+<p>Sub-50 ms decisions cannot afford a 360M decoder in the hot path. The pattern that works: pre-compute SLM features
+for slow-moving entities (merchant, customer, device) offline, then let the real-time model consume them.</p>
+<pre><code>offline  : SLM(merchant_profile)  -> embedding + risk tag, refreshed nightly
+realtime : gradient_boosted(txn_features, slm_features)  -> action,   p99 18 ms</code></pre>
+<p>This keeps the SLM's judgement without its latency, and it is the most common production pattern in payments.</p>
+
+  <div class="pager"><a class="prev" href="../use-cases/healthcare.html"><span class="dir">Previous</span>Healthcare</a><a class="next" href="../use-cases/industrial.html"><span class="dir">Next</span>Industrial</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

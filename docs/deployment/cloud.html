@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud · SLM Decision Models</title>
+<meta name="description" content="AWS, GCP and Azure options for a small model, with the cost arithmetic that decides between them.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item active" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Deployment / Cloud</div>
+  <h1>Cloud</h1>
+  <p class="subtitle">AWS, GCP and Azure options for a small model, with the cost arithmetic that decides between them.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>A 360M INT8 model does not need a GPU. That single fact reshapes cloud deployment: you are choosing between CPU
+instance types, container runtimes and managed inference endpoints, and the cheapest option is usually not the one
+marketed for AI.</p>
+
+<h2>Options compared</h2>
+<table>
+<thead><tr><th>Option</th><th>AWS</th><th>GCP</th><th>Azure</th><th>Fit</th></tr></thead>
+<tbody>
+<tr><td>Managed containers</td><td>ECS Fargate</td><td>Cloud Run</td><td>Container Apps</td><td>Best default for CPU inference</td></tr>
+<tr><td>Kubernetes</td><td>EKS</td><td>GKE Autopilot</td><td>AKS</td><td>When you already run a cluster</td></tr>
+<tr><td>Serverless functions</td><td>Lambda (container)</td><td>Cloud Functions</td><td>Functions</td><td>Poor — cold start loads the model</td></tr>
+<tr><td>Managed inference</td><td>SageMaker</td><td>Vertex AI</td><td>Azure ML</td><td>When you need the surrounding MLOps</td></tr>
+<tr><td>GPU (only if needed)</td><td>g5.xlarge (T4)</td><td>g2-standard-4</td><td>NCasT4_v3</td><td>&gt; 1B models or high throughput</td></tr>
+</tbody>
+</table>
+
+<h2>Cost arithmetic</h2>
+<p>Steady 20 requests/second, 24×7, 360M INT8 at ~40 req/s per vCPU:</p>
+<table>
+<thead><tr><th>Setup</th><th>Shape</th><th>Approx monthly</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Cloud Run / Fargate</td><td>1 vCPU, 1 GB, min-instances 1</td><td>$25–$45</td><td>Scale to zero is not viable — cold start reloads the model</td></tr>
+<tr><td>Reserved VM</td><td>2 vCPU, 4 GB</td><td>$12–$30</td><td>Cheapest steady-state; you own the patching</td></tr>
+<tr><td>Managed inference endpoint</td><td>1 small instance</td><td>$60–$200</td><td>Pays for itself only if you use the surrounding tooling</td></tr>
+<tr><td>Single T4 GPU</td><td>1× T4, 16 GB</td><td>$180–$350</td><td>Only worth it above ~100 req/s or for &gt; 1B models</td></tr>
+</tbody>
+</table>
+<p class="mono" style="font-size:12.5px;color:#5c6472">Order-of-magnitude estimates from public list prices; verify
+against current pricing and your committed-use discounts. The conclusion that matters: a CPU container is 5–10×
+cheaper than a GPU for a sub-1B model at moderate volume.</p>
+
+<h2>Reference architecture (managed containers)</h2>
+<pre><code>client ──► API gateway (auth, rate limit, WAF)
+              │
+              ▼
+        decision service (container, CPU, min 1 / max 10)
+              │            │
+              │            └──► decision log (append-only, e.g. S3 + Athena)
+              ▼
+        downstream action (ticket, ledger, queue)</code></pre>
+<ul class="checklist">
+<li>Model artefact pulled from object storage by digest at build time, never at runtime.</li>
+<li>Min instances ≥ 1 so the first request of the day is not a 30-second cold start.</li>
+<li>Concurrency per instance sized to CPU, not to request count: 2 vCPU ≈ 2–3 concurrent decisions for a 360M model.</li>
+<li>Autoscale on queue depth or p95 latency, not CPU alone — CPU saturates before latency degrades visibly.</li>
+<li>Decision log immutable and queryable; it is both your audit trail and your next training set.</li>
+</ul>
+
+<h2>Serverless cold start, quantified</h2>
+<pre><code>cold start = image pull + process start + model load + warm-up
+360M INT8, 360 MB artefact : ~1.5 s load + 0.4 s framework import + ~0.2 s warm-up
+                             ≈ 2.1 s typical, up to 6 s under a cold page cache
+hot path                   : 25 ms</code></pre>
+<p>A 2-second cold start against a 25 ms hot path is an 80× amplification. For anything user-facing, keep a warm
+minimum; for batch or overnight work, scale to zero and accept it.</p>
+
+<h2>Data residency and India-specific notes</h2>
+<ul class="checklist">
+<li>RBI's storage directions require payment data to be stored in India; choose a region accordingly and keep the
+decision log inside it.</li>
+<li>DPDP Act obligations apply to personal data in decision logs — minimise, encrypt, and set retention explicitly.</li>
+<li>For regulated workloads, a self-hosted model in your own VPC usually clears legal review faster than a managed
+third-party endpoint.</li>
+</ul>
+
+<h2>Multi-region, only if you must</h2>
+<p>Two regions doubles cost and adds a consistency problem for the decision log. Do it when a regulatory requirement
+or a hard latency SLA demands it, and make one region authoritative for the log.</p>
+
+  <div class="pager"><a class="prev" href="../deployment/docker.html"><span class="dir">Previous</span>Docker</a><a class="next" href="../deployment/edge.html"><span class="dir">Next</span>Edge devices</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

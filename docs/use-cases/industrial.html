@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Industrial · SLM Decision Models</title>
+<meta name="description" content="Maintenance, quality and supply-chain decisions where the SLM reads technician notes and the rulebook is 400 pages.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item active" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Use cases / Industrial</div>
+  <h1>Industrial</h1>
+  <p class="subtitle">Maintenance, quality and supply-chain decisions where the SLM reads technician notes and the rulebook is 400 pages.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Industrial decisions rarely arrive as clean text. They arrive as a technician's note, a work order, a sensor
+alarm, and a maintenance manual. The SLM's job is to join those into a structured decision: fix now, schedule,
+monitor, or escalate.</p>
+
+<h2>Decision inventory</h2>
+<table>
+<thead><tr><th>Decision</th><th>Input</th><th>Actions</th><th>Value driver</th></tr></thead>
+<tbody>
+<tr><td>Work-order triage</td><td>Free-text fault report + asset id</td><td>immediate · next-shift · planned · monitor</td><td>Downtime hours avoided</td></tr>
+<tr><td>Root-cause suggestion</td><td>Alarm sequence + manual excerpt</td><td>ranked causes with confidence</td><td>Mean time to repair</td></tr>
+<tr><td>Quality hold</td><td>Inspection note + batch record</td><td>release · rework · scrap</td><td>Scrap cost vs recall risk</td></tr>
+<tr><td>Supplier exception</td><td>Email/EDI text + history</td><td>accept · expedite · substitute · escalate</td><td>Line-stop avoidance</td></tr>
+</tbody>
+</table>
+
+<h2>Numbers that justify the build</h2>
+<table>
+<thead><tr><th>Quantity</th><th>Before</th><th>After</th><th>Assumption</th></tr></thead>
+<tbody>
+<tr><td>Work-order misclassification</td><td>22%</td><td>6%</td><td>4-class triage, 8k labelled orders</td></tr>
+<tr><td>Average dispatch delay</td><td>4.2 h</td><td>0.9 h</td><td>Planner queue time removed for auto-decided cases</td></tr>
+<tr><td>Downtime cost</td><td>₹8.5L/month</td><td>₹6.1L/month</td><td>₹1.2L per hour of unplanned stop, 2 stops avoided</td></tr>
+<tr><td>Model cost</td><td>—</td><td>₹4,000/month</td><td>360M INT8 on an existing edge server</td></tr>
+</tbody>
+</table>
+<p class="mono" style="font-size:12.5px;color:#5c6472">Illustrative plant economics. The pattern to copy is the
+denominator: one avoided hour of unplanned downtime usually pays for a year of inference.</p>
+
+<h2>Spec and policy</h2>
+<pre><code>spec = DecisionSpec(
+    name="work_order_triage",
+    actions=["immediate", "next_shift", "planned", "monitor"],
+    costs={
+        ("immediate",  "critical"): 0,        ("immediate",  "minor"): 18_000,
+        ("next_shift", "critical"): 120_000,  ("next_shift", "minor"): 2_000,
+        ("planned",    "critical"): 260_000,  ("planned",    "minor"): 0,
+        ("monitor",    "critical"): 480_000,  ("monitor",    "minor"): 0,
+    },
+    abstain="next_shift",
+)</code></pre>
+
+<h2>Reading the manual: retrieval is mandatory</h2>
+<p>Plant rules live in PDFs that change quarterly. Retrieval over the maintenance manual is what makes the decision
+correct rather than merely plausible:</p>
+<pre><code>retriever = Retriever(index="maintenance-manual", embed_model="BAAI/bge-small-en-v1.5", top_k=4)
+policy = HybridPolicy(spec, slm=slm, retriever=retriever,
+                      template="Relevant procedure:\n{context}\n\nFault report:\n{query}\n\nPriority?")
+# keep retrieved context <= ~40% of the 2k window; beyond that small models get worse</code></pre>
+
+<h2>Edge deployment reality</h2>
+<p>Plant networks are air-gapped and often offline. A 360M INT8 model (~360 MB) fits a fanless industrial PC with
+4 GB RAM; a 66M encoder fits a Raspberry Pi 4 in under 200 MB. Sync the model artefact on a USB or an internal
+registry — plan for the update path before you plan for the model.</p>
+<ul class="checklist">
+<li>Model + tokenizer + calibration bundled as one signed artefact, verified on load.</li>
+<li>Graceful degradation: if the model fails to load, fall back to the deterministic rule table.</li>
+<li>Local logging with store-and-forward; never block a decision on network availability.</li>
+<li>Rollback in one command, offline.</li>
+</ul>
+
+<h2>Human factors</h2>
+<p>Planners override models they do not trust, and they are usually right to. Show the model's suggestion <em>with</em>
+the manual excerpt it used; override rates drop sharply when the evidence is visible, and every override is a free
+label for the next training round.</p>
+
+  <div class="pager"><a class="prev" href="../use-cases/finance.html"><span class="dir">Previous</span>Finance</a><a class="next" href="../use-cases/gaming.html"><span class="dir">Next</span>Gaming</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

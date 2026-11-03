@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optimization techniques · SLM Decision Models</title>
+<meta name="description" content="Quantisation, distillation, pruning, ONNX and vocabulary surgery — ranked by what actually pays.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item active" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Benchmarks / Optimization techniques</div>
+  <h1>Optimization techniques</h1>
+  <p class="subtitle">Quantisation, distillation, pruning, ONNX and vocabulary surgery — ranked by what actually pays.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Optimisation effort should follow the bottleneck. Most teams quantise first because it is easy, when their actual
+problem is that they are generating 60 tokens for a decision that needs one.</p>
+
+<h2>Ranked by return</h2>
+<table>
+<thead><tr><th>Technique</th><th>Typical gain</th><th>Effort</th><th>Risk</th></tr></thead>
+<tbody>
+<tr><td>Shorten the output (1 token, not 60)</td><td>5–20× latency</td><td>Hours</td><td>Low — often improves accuracy on classification</td></tr>
+<tr><td>Switch encoder for decoder where possible</td><td>5–10× latency</td><td>Days</td><td>Low if the task is classification</td></tr>
+<tr><td>ONNX Runtime instead of PyTorch</td><td>1.3–2× CPU latency, 5–20× smaller image</td><td>Hours</td><td>Low; verify numerics</td></tr>
+<tr><td>INT8 dynamic quantisation</td><td>2–4× memory, 1.5–3× speed</td><td>Hours</td><td>0.5–2 points accuracy, measure it</td></tr>
+<tr><td>Distillation to a smaller student</td><td>10–40× latency</td><td>Days–weeks</td><td>Ceiling at teacher quality</td></tr>
+<tr><td>INT4 quantisation (GPTQ/AWQ)</td><td>2× memory over INT8</td><td>Days</td><td>Higher accuracy risk; needs calibration data</td></tr>
+<tr><td>Pruning (structured)</td><td>1.2–2× speed at 30–50% sparsity</td><td>Weeks</td><td>Retraining required; often loses to distillation</td></tr>
+<tr><td>Vocabulary trimming</td><td>10–20% smaller embeddings</td><td>Days</td><td>Breaks tokenizer compatibility; careful with multilingual</td></tr>
+<tr><td>KV-cache / paged attention</td><td>2–4× throughput at high concurrency</td><td>Days</td><td>Framework-specific</td></tr>
+</tbody>
+</table>
+
+<h2>Quantisation, concretely</h2>
+<pre><code># dynamic INT8 — no calibration data, works well for encoders
+from optimum.onnxruntime import ORTQuantizer
+from optimum.onnxruntime.configuration import AutoQuantizationConfig
+
+q = ORTQuantizer.from_pretrained("out/model-onnx")
+q.quantize(save_dir="out/model-int8",
+           quantization_config=AutoQuantizationConfig.avx512_vnni(is_static=False, per_channel=False))
+
+# static INT8 — better accuracy retention, needs ~200 calibration samples
+cfg = AutoQuantizationConfig.avx512_vnni(is_static=True, per_channel=True)
+# provide a calibration dataset drawn from your real input distribution</code></pre>
+<table>
+<thead><tr><th>Precision</th><th>Bytes/param</th><th>360M model size</th><th>Accuracy effect</th></tr></thead>
+<tbody>
+<tr><td>FP32</td><td>4.0</td><td>1.44 GB</td><td>reference</td></tr>
+<tr><td>FP16 / BF16</td><td>2.0</td><td>720 MB</td><td>negligible</td></tr>
+<tr><td>INT8</td><td>1.0</td><td>360 MB</td><td>−0.5 to −2 points typical</td></tr>
+<tr><td>INT4</td><td>0.5</td><td>180 MB</td><td>−1 to −5 points; task-dependent</td></tr>
+</tbody>
+</table>
+<div class="callout warn"><b>Always re-run the calibration fit after quantising</b>
+Quantisation distorts the probability scale, so a temperature fitted on FP16 weights will be wrong on INT8. Refit on a
+held-out slice and re-measure ECE — the cost of forgetting this is systematically wrong thresholds.</div>
+
+<h2>Output-length surgery</h2>
+<pre><code># before: generate a sentence, parse the label out of it   (~60 tokens, 380 ms)
+prompt = 'Read the claim and explain your reasoning, then state the action.'
+
+# after: score the label token directly                    (1 forward pass, 25 ms)
+logits = model(input_ids).logits[0, -1]
+p = softmax({a: logits[token_id(a)] for a in ACTIONS})</code></pre>
+<p>This is the single largest latency win available to most decision models, and it usually <em>improves</em> accuracy
+because it removes the chance of a fluent-but-wrong rationale overriding the correct label.</p>
+
+<h2>Structured pruning, and why it often loses</h2>
+<pre><code>import torch.nn.utils.prune as prune
+# structured: remove entire attention heads or FFN channels (real speedup)
+prune.ln_structured(module.ffn, name="weight", amount=0.3, n=2, dim=0)
+# unstructured: zero individual weights (memory win only, needs sparse kernels)</code></pre>
+<p>Unstructured pruning rarely speeds up dense hardware. Structured pruning at 30% typically needs a short
+re-distillation to recover 1–2 points. Distilling a smaller student from scratch usually beats pruning a larger one at
+equal final size, which is why pruning sits low on the list.</p>
+
+<h2>Batching and concurrency</h2>
+<table>
+<thead><tr><th>Setting</th><th>Throughput</th><th>p95 latency</th><th>Use for</th></tr></thead>
+<tbody>
+<tr><td>Batch 1, 4 threads</td><td>~40 req/s</td><td>41 ms</td><td>Interactive</td></tr>
+<tr><td>Batch 8, 4 threads</td><td>~180 req/s</td><td>95 ms</td><td>Near-real-time queues</td></tr>
+<tr><td>Batch 32, 8 threads</td><td>~420 req/s</td><td>310 ms</td><td>Overnight or offline scoring</td></tr>
+</tbody>
+</table>
+<p>Dynamic batching with a 10 ms window is the standard compromise: throughput up ~3× for a p95 increase of ~20 ms.</p>
+
+<h2>Optimisation checklist</h2>
+<ul class="checklist">
+<li>Measure first — profile p50 and p95 separately, and find where the time actually goes.</li>
+<li>Cut output length before touching precision.</li>
+<li>Export to ONNX and compare numerics on 500 examples before switching.</li>
+<li>Quantise, then refit calibration, then re-run the full eval suite.</li>
+<li>Distil only if the smaller model is still not fast enough after the above.</li>
+<li>Record the configuration with every benchmark result, or the numbers are not reusable.</li>
+</ul>
+
+  <div class="pager"><a class="prev" href="../benchmarks/comparison.html"><span class="dir">Previous</span>Model comparison</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

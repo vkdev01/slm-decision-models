@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edge devices · SLM Decision Models</title>
+<meta name="description" content="Raspberry Pi, Jetson and mobile: ONNX Runtime, quantisation, and the memory arithmetic that decides what fits.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item active" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Deployment / Edge devices</div>
+  <h1>Edge devices</h1>
+  <p class="subtitle">Raspberry Pi, Jetson and mobile: ONNX Runtime, quantisation, and the memory arithmetic that decides what fits.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Edge deployment is a memory problem first and a compute problem second. If the model does not fit in RAM with room
+for the runtime, nothing else matters.</p>
+
+<h2>What fits where</h2>
+<table>
+<thead><tr><th>Device</th><th>RAM</th><th>Realistic model ceiling</th><th>Latency (66M encoder)</th></tr></thead>
+<tbody>
+<tr><td>Raspberry Pi 4 / 5 (4 GB)</td><td>4 GB</td><td>~200M INT8 encoder</td><td>35–60 ms</td></tr>
+<tr><td>Raspberry Pi Zero 2 W</td><td>512 MB</td><td>~20M INT8 encoder (distilled)</td><td>250–400 ms</td></tr>
+<tr><td>Jetson Orin Nano (8 GB)</td><td>8 GB</td><td>1–1.7B INT8</td><td>8–15 ms</td></tr>
+<tr><td>Mobile (modern SoC, 6–8 GB)</td><td>shared</td><td>~350M INT8</td><td>20–45 ms</td></tr>
+<tr><td>Industrial PC (4 GB, fanless)</td><td>4 GB</td><td>~360M INT8</td><td>25–50 ms</td></tr>
+</tbody>
+</table>
+<p>Rule of thumb: usable model size ≈ 25% of device RAM. The runtime, tokenizer, OS page cache and your application all
+compete for the rest.</p>
+
+<h2>ONNX Runtime beats PyTorch on edge</h2>
+<pre><code># export once, on a machine with torch
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from optimum.onnxruntime import ORTModelForSequenceClassification, ORTQuantizer
+from optimum.onnxruntime.configuration import AutoQuantizationConfig
+
+model = AutoModelForSequenceClassification.from_pretrained("out/clf")
+tok = AutoTokenizer.from_pretrained("out/clf")
+
+ort_model = ORTModelForSequenceClassification.from_pretrained("out/clf", export=True)
+ort_model.save_pretrained("out/clf-onnx")
+
+q = ORTQuantizer.from_pretrained("out/clf-onnx")
+q.quantize(save_dir="out/clf-onnx-int8", quantization_config=AutoQuantizationConfig.arm64(is_static=False, per_channel=False))</code></pre>
+<table>
+<thead><tr><th>Runtime</th><th>Size on disk</th><th>RSS</th><th>Latency (Pi 4, 66M)</th></tr></thead>
+<tbody>
+<tr><td>PyTorch FP32</td><td>265 MB + 800 MB wheel</td><td>~1.1 GB</td><td>95 ms</td></tr>
+<tr><td>ONNX FP32</td><td>265 MB + 40 MB runtime</td><td>~420 MB</td><td>52 ms</td></tr>
+<tr><td>ONNX INT8 (dynamic)</td><td>68 MB + 40 MB runtime</td><td>~180 MB</td><td>38 ms</td></tr>
+</tbody>
+</table>
+<p class="mono" style="font-size:12.5px;color:#5c6472">Illustrative. Dynamic INT8 quantisation typically costs 0.5–2
+points of accuracy on a 66M encoder; measure on your own validation set before shipping.</p>
+
+<h2>Inference loop, edge-safe</h2>
+<pre><code>import onnxruntime as ort, numpy as np
+from transformers import AutoTokenizer
+
+sess_options = ort.SessionOptions()
+sess_options.intra_op_num_threads = 2
+sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+
+sess = ort.InferenceSession("out/clf-onnx-int8/model_quantized.onnx", sess_options,
+                            providers=["CPUExecutionProvider"])
+tok = AutoTokenizer.from_pretrained("out/clf")
+
+def decide(text, max_len=256):
+    enc = tok(text, truncation=True, max_length=max_len, padding=True, return_tensors="np")
+    logits = sess.run(None, {"input_ids": enc["input_ids"],
+                             "attention_mask": enc["attention_mask"]})[0]
+    p = np.exp(logits) / np.exp(logits).sum(-1, keepdims=True)
+    idx = int(p[0].argmax())
+    return LABELS[idx], float(p[0][idx])</code></pre>
+
+<h2>Operating constraints on real devices</h2>
+<ul class="checklist">
+<li><b>No network at inference.</b> Bundle tokenizer and calibration; never fetch at startup.</li>
+<li><b>Signed artefacts.</b> Verify a hash before loading; a corrupted model on a remote device is unrecoverable
+without a site visit.</li>
+<li><b>Thermal throttling.</b> Sustained inference on a passively cooled Pi drops throughput 20–40%. Benchmark after
+10 minutes of load, not 10 seconds.</li>
+<li><b>Store-and-forward logging.</b> Buffer decisions locally, flush when connectivity returns.</li>
+<li><b>Deterministic fallback.</b> If the model fails to load, the rule table must still decide.</li>
+<li><b>OTA updates with rollback.</b> Keep the previous artefact on disk; switching back is a symlink flip.</li>
+</ul>
+
+<h2>Battery and power</h2>
+<pre><code>energy per 1k decisions ≈ (mean_power_w × latency_s × 1000) / 3600   [Wh]
+# 3 W device, 40 ms per decision: 3 × 0.04 × 1000 / 3600 ≈ 0.033 Wh per 1k decisions</code></pre>
+<p>On battery-powered devices the decision that matters is usually <em>how often</em> to run the model, not which model
+to run. Batch local decisions and run them on a schedule.</p>
+
+  <div class="pager"><a class="prev" href="../deployment/cloud.html"><span class="dir">Previous</span>Cloud</a><a class="next" href="../deployment/cicd.html"><span class="dir">Next</span>CI/CD</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

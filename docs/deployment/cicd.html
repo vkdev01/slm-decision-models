@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CI/CD · SLM Decision Models</title>
+<meta name="description" content="A pipeline that gates on decision quality, not just on tests passing — plus model artefacts as versioned releases.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item active" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Deployment / CI/CD</div>
+  <h1>CI/CD</h1>
+  <p class="subtitle">A pipeline that gates on decision quality, not just on tests passing — plus model artefacts as versioned releases.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>Standard CI checks that code compiles. A decision-model pipeline must also check that the model still decides well,
+that latency has not regressed, and that the artefact you deploy is the one you evaluated.</p>
+
+<h2>Pipeline shape</h2>
+<pre><code>push ──► lint + types ──► unit tests ──► train/eval (if model changed) ──► quality gate
+                                                                    │
+                                          ┌─────────────────────────┘
+                                          ▼
+                              package artefact ──► staging deploy ──► replay diff ──► prod</code></pre>
+
+<h2>GitHub Actions workflow</h2>
+<pre><code>name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt && pip install -e code/
+      - run: pip install pytest pytest-cov ruff mypy
+      - run: ruff check code/ tests/
+      - run: mypy code/src/slm_decision --ignore-missing-imports
+      - run: pytest tests/ -q --cov=slm_decision --cov-fail-under=85 -m "not slow"
+
+  quality-gate:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt && pip install -e code/
+      - name: Evaluate on golden set
+        run: python benchmarks/evaluate.py --golden data/golden.jsonl --out eval.json
+      - name: Gate
+        run: python benchmarks/gate.py eval.json --baseline benchmarks/baseline.json
+      - uses: actions/upload-artifact@v4
+        with: { name: eval-report, path: eval.json }
+
+  notebooks:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt && pip install -e code/ nbconvert jupyter
+      - run: jupyter nbconvert --to notebook --execute notebooks/*.ipynb --output-dir /tmp/nb</code></pre>
+
+<h2>The quality gate</h2>
+<pre><code># benchmarks/gate.py
+import json, sys
+
+ev = json.load(open(sys.argv[1]))
+base = json.load(open(sys.argv[2]))
+
+GATES = [
+    ("macro_f1",      "min_delta", -0.01),
+    ("cost_per_case", "max_ratio",  1.05),
+    ("abstain_rate",  "band",      (0.8, 1.2)),
+    ("ece",           "max_abs",    0.05),
+    ("p95_ms",        "max_ratio",  1.20),
+]
+
+failures = []
+for metric, kind, arg in GATES:
+    cur, ref = ev[metric], base[metric]
+    if kind == "min_delta" and cur - ref &lt; arg:
+        failures.append(f"{metric}: {cur:.3f} vs {ref:.3f} (delta {cur-ref:+.3f})")
+    elif kind == "max_ratio" and cur &gt; ref * arg:
+        failures.append(f"{metric}: {cur:.3f} exceeds {ref:.3f} x {arg}")
+    elif kind == "band" and not (ref*arg[0] &lt;= cur &lt;= ref*arg[1]):
+        failures.append(f"{metric}: {cur:.3f} outside band around {ref:.3f}")
+    elif kind == "max_abs" and cur &gt; arg:
+        failures.append(f"{metric}: {cur:.3f} above {arg}")
+
+print("FAIL\n" + "\n".join(failures) if failures else "PASS")
+sys.exit(1 if failures else 0)</code></pre>
+
+<h2>Artefact as a release</h2>
+<pre><code>release v1.4.0
+├── slm-360m-int8/            # weights + tokenizer + calibration.json
+├── spec.json                 # decision spec, versioned independently
+├── eval.json                 # full report, generated by CI
+├── manifest.json             # git sha, data snapshot, hyperparameters, base model revision
+└── SHA256SUMS</code></pre>
+<p>Tag the release, keep the artefact immutable, and record the digest in the deployment. "Which model made this
+decision" must be answerable from the log alone, years later.</p>
+
+<h2>Deployment strategies</h2>
+<table>
+<thead><tr><th>Strategy</th><th>How</th><th>Use when</th></tr></thead>
+<tbody>
+<tr><td>Shadow</td><td>New model logs decisions, old model acts</td><td>Always, for 3–7 days, before any switch</td></tr>
+<tr><td>Canary</td><td>5% → 25% → 100% of traffic</td><td>Standard switch</td></tr>
+<tr><td>Sticky by entity</td><td>Hash customer id to a model version</td><td>Decisions must be consistent per customer</td></tr>
+<tr><td>Blue/green</td><td>Full switch with instant rollback</td><td>Low-traffic or high-urgency fixes</td></tr>
+</tbody>
+</table>
+
+<h2>Rollback must be one command</h2>
+<pre><code>./deploy.sh --rollback v1.3.2      # pointer flip, no rebuild
+# verify
+curl -s localhost:8000/ready | jq -r .model</code></pre>
+<p>Practice the rollback before you need it. A rollback path that has never been exercised is a plan, not a control.</p>
+
+<h2>What to monitor after deploy</h2>
+<ul class="checklist">
+<li>Decision distribution drift: a shift of more than 5 points in action mix in 24 hours is an incident signal.</li>
+<li>Abstain rate against the capacity plan — rising abstention silently overloads reviewers.</li>
+<li>p95 latency and error rate, per model version.</li>
+<li>Schema-violation rate, which should be zero and is not an acceptable background level.</li>
+<li>Override rate by reviewers, which is your earliest honest quality signal.</li>
+</ul>
+
+  <div class="pager"><a class="prev" href="../deployment/edge.html"><span class="dir">Previous</span>Edge devices</a><a class="next" href="../benchmarks/metrics.html"><span class="dir">Next</span>Metrics</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

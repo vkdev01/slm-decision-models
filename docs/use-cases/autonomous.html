@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autonomous systems · SLM Decision Models</title>
+<meta name="description" content="Where the SLM advises and the classical stack decides — the safety architecture that keeps a language model out of the control loop.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item active" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Use cases / Autonomous systems</div>
+  <h1>Autonomous systems</h1>
+  <p class="subtitle">Where the SLM advises and the classical stack decides — the safety architecture that keeps a language model out of the control loop.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>In vehicles, drones and robots, an SLM does not drive. It converts messy human context — a passenger request, a
+maintenance note, a scene description — into structured intent that a deterministic planner can act on. The
+separation is not conservatism; it is the only way to get a certifiable system.</p>
+
+<h2>Architecture: SLM outside the loop</h2>
+<pre><code>perception ──► planner ──► controller ──► actuators      (deterministic, certified)
+                  ▲
+                  │  structured intent, low rate (≤ 2 Hz)
+                SLM decision layer                        (probabilistic, monitored)</code></pre>
+<table>
+<thead><tr><th>Layer</th><th>Decides</th><th>Rate</th><th>Verification</th></tr></thead>
+<tbody>
+<tr><td>Controller</td><td>torque, steering</td><td>100–1000 Hz</td><td>Formal, certified</td></tr>
+<tr><td>Planner</td><td>trajectory, mission</td><td>5–50 Hz</td><td>Simulation + reachability</td></tr>
+<tr><td>SLM layer</td><td>intent, priority, exception handling</td><td>≤ 2 Hz</td><td>Statistical + guardrails</td></tr>
+</tbody>
+</table>
+<p>The SLM never emits a control value. It emits an intent from a closed enumeration, which the planner validates
+against safety constraints before acting. If the intent is invalid or late, the planner falls back to a safe nominal
+behaviour — that fallback is the design, not the exception path.</p>
+
+<h2>Decision inventory</h2>
+<table>
+<thead><tr><th>Decision</th><th>Actions</th><th>SLM role</th></tr></thead>
+<tbody>
+<tr><td>Passenger request interpretation</td><td>reroute · stop · continue · clarify</td><td>Parse natural language into intent</td></tr>
+<tr><td>Mission exception handling</td><td>return-to-base · hold · continue · abort</td><td>Interpret a human operator's instruction</td></tr>
+<tr><td>Scene anomaly triage</td><td>nominal · slow · stop · handover</td><td>Summarise perception output for a remote operator</td></tr>
+<tr><td>Fleet maintenance routing</td><td>ground · service-next · continue</td><td>Read fault logs and decide priority</td></tr>
+</tbody>
+</table>
+
+<h2>Guardrails, in code</h2>
+<pre><code>ALLOWED = {"reroute", "stop", "continue", "clarify"}
+
+def slm_intent(context, timeout_ms=250):
+    try:
+        raw = slm.decide(context, timeout_ms=timeout_ms)
+    except TimeoutError:
+        return "hold_nominal"                       # fail safe, not fail open
+    if raw.action not in ALLOWED:
+        return "hold_nominal"
+    if raw.confidence &lt; 0.55:
+        return "clarify"                            # ask the human, do not guess
+    if not planner.is_safe(raw.action, context):     # deterministic veto
+        return "hold_nominal"
+    return raw.action</code></pre>
+<ul class="checklist">
+<li>Hard timeout on every model call; the safe behaviour is always available without the model.</li>
+<li>Deterministic veto: the planner can reject any SLM intent, and does so on constraint violation.</li>
+<li>Closed action space, schema-validated, with an explicit unknown branch.</li>
+<li>No model update without a re-run of the scenario suite and a shadow-mode period.</li>
+<li>Every intent logged with model version, input hash, confidence and the planner's accept/reject.</li>
+</ul>
+
+<h2>Numbers that matter</h2>
+<table>
+<thead><tr><th>Quantity</th><th>Target</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Intent latency p99</td><td>≤ 250 ms</td><td>Must complete inside the operator interaction window</td></tr>
+<tr><td>Invalid-intent rate</td><td>≤ 0.1%</td><td>Every invalid intent costs a fallback event</td></tr>
+<tr><td>Fallback rate</td><td>≤ 2%</td><td>Above this the SLM is not adding value</td></tr>
+<tr><td>False "continue" on unsafe context</td><td>0 in the scenario suite</td><td>The one error class that cannot be traded off</td></tr>
+<tr><td>Shadow-mode duration</td><td>≥ 500 logged hours</td><td>Statistical floor before enabling</td></tr>
+</tbody>
+</table>
+
+<div class="callout danger"><b>Certification is the constraint, not the model</b>
+ISO 26262 (automotive), DO-178C (airborne) and IEC 61508 (industrial) do not currently provide a route to certify a
+learned component in a safety-critical function. Keep the SLM in an advisory, low-rate, human-supervised role, and
+keep the certified stack deterministic. Anything else is a research programme, not a product.</div>
+
+<h2>Simulation before silicon</h2>
+<p>Test in simulation with adversarial scenarios, then in shadow mode on real vehicles with the SLM's output logged
+but not actuated. Compare the SLM's suggested intent against what the human operator actually did — that agreement
+rate is your readiness metric, and it is cheap to collect.</p>
+
+  <div class="pager"><a class="prev" href="../use-cases/education.html"><span class="dir">Previous</span>Education</a><a class="next" href="../testing/unit-testing.html"><span class="dir">Next</span>Unit testing</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

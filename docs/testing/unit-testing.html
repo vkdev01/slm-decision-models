@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unit testing · SLM Decision Models</title>
+<meta name="description" content="What to test on a decision model: the arithmetic, the policy, the schema — everything except the weights.">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+<button class="burger" aria-label="Toggle navigation">☰</button>
+<div class="layout">
+<aside class="sidebar">
+  <a class="brand" href="../index.html"><b>SLM Decision Models</b><span>Converting small language models into reliable decision systems</span></a>
+  <div class="nav-search"><input id="navFilter" type="search" placeholder="Filter pages…" aria-label="Filter pages"></div>
+  <h4>Start</h4>
+<a class="item" href="../index.html">Overview</a>
+<h4>Guides</h4>
+<a class="item" href="../guides/00-quick-start.html">00 · Quick start</a>
+<a class="item" href="../guides/01-slm-fundamentals.html">01 · SLM fundamentals</a>
+<a class="item" href="../guides/02-decision-theory.html">02 · Decision theory</a>
+<a class="item" href="../guides/03-why-slms.html">03 · Why SLMs for decisions</a>
+<a class="item" href="../guides/04-distillation.html">04 · Distillation</a>
+<a class="item" href="../guides/05-finetuning.html">05 · Fine-tuning</a>
+<a class="item" href="../guides/06-prompt-engineering.html">06 · Prompt engineering</a>
+<a class="item" href="../guides/07-hybrid-systems.html">07 · Hybrid systems</a>
+<h4>Code & notebooks</h4>
+<a class="item" href="../code/py-slm-decision.html">Python library</a>
+<a class="item" href="../notebooks/01-distillation-basics.html">NB1 · Distillation</a>
+<a class="item" href="../notebooks/02-finetuning-medical.html">NB2 · Medical triage</a>
+<a class="item" href="../notebooks/03-prompt-engineering.html">NB3 · Prompting</a>
+<a class="item" href="../notebooks/04-evaluation-metrics.html">NB4 · Evaluation</a>
+<h4>Use cases</h4>
+<a class="item" href="../use-cases/healthcare.html">Healthcare</a>
+<a class="item" href="../use-cases/finance.html">Finance</a>
+<a class="item" href="../use-cases/industrial.html">Industrial</a>
+<a class="item" href="../use-cases/gaming.html">Gaming</a>
+<a class="item" href="../use-cases/education.html">Education</a>
+<a class="item" href="../use-cases/autonomous.html">Autonomous systems</a>
+<h4>Testing</h4>
+<a class="item active" href="../testing/unit-testing.html">Unit testing</a>
+<a class="item" href="../testing/integration-testing.html">Integration testing</a>
+<a class="item" href="../testing/edge-cases.html">Edge cases</a>
+<a class="item" href="../testing/benchmarking.html">Benchmarking</a>
+<h4>Deployment</h4>
+<a class="item" href="../deployment/docker.html">Docker</a>
+<a class="item" href="../deployment/cloud.html">Cloud</a>
+<a class="item" href="../deployment/edge.html">Edge devices</a>
+<a class="item" href="../deployment/cicd.html">CI/CD</a>
+<h4>Benchmarks</h4>
+<a class="item" href="../benchmarks/metrics.html">Metrics</a>
+<a class="item" href="../benchmarks/comparison.html">Model comparison</a>
+<a class="item" href="../benchmarks/optimization.html">Optimization</a>
+  <div class="foot"><a href="https://github.com/vkdev01/slm-decision-models">Repository</a> · <a href="https://vkdev01.github.io/slm-decision-models/">Live docs</a><br>MIT licensed · built for practitioners</div>
+</aside>
+<main>
+<div class="wrap">
+  <div class="crumbs"><a href="../index.html">Docs</a> / Testing / Unit testing</div>
+  <h1>Unit testing</h1>
+  <p class="subtitle">What to test on a decision model: the arithmetic, the policy, the schema — everything except the weights.</p>
+  <nav class="toc" id="toc" style="display:none"><b>On this page</b></nav>
+  
+<p>A decision model has more testable surface than a classifier, because the decision layer is ordinary code. The rule
+of thumb: <b>test the maths exhaustively, test the model statistically, and never test the model's exact output.</b></p>
+
+<h2>What belongs in a unit test</h2>
+<table>
+<thead><tr><th>Target</th><th>Example assertion</th><th>Speed</th></tr></thead>
+<tbody>
+<tr><td>Cost arithmetic</td><td><code>expected_cost</code> of a known action vector equals a hand-computed value</td><td>&lt; 1 ms</td></tr>
+<tr><td>Threshold derivation</td><td>cost ratio 5:1 produces threshold 0.833</td><td>&lt; 1 ms</td></tr>
+<tr><td>Policy monotonicity</td><td>higher score never yields a strictly worse action</td><td>&lt; 1 ms</td></tr>
+<tr><td>Calibrator</td><td>temperature fit on synthetic data recovers T within 0.1</td><td>~5 ms</td></tr>
+<tr><td>Schema validation</td><td>malformed model output maps to the abstain action</td><td>&lt; 1 ms</td></tr>
+<tr><td>Spec validation</td><td>missing cost cell raises <code>ValueError</code></td><td>&lt; 1 ms</td></tr>
+</tbody>
+</table>
+
+<h2>Worked test file</h2>
+<pre><code>import numpy as np
+import pytest
+from slm_decision import (DecisionSpec, RulePolicy, CostOptimalPolicy,
+                          TemperatureCalibrator, ece, expected_cost)
+
+SPEC = DecisionSpec(
+    name="t",
+    actions=["approve", "review", "decline"],
+    costs={("approve","bad"):120.0, ("approve","good"):0.0,
+           ("review","bad"):1.0,   ("review","good"):1.0,
+           ("decline","bad"):0.0,  ("decline","good"):24.0},
+    abstain="review",
+)
+
+BINARY = DecisionSpec(
+    actions=["approve", "decline"],
+    costs={("approve", "bad"): 120.0, ("approve", "good"): 0.0,
+           ("decline", "bad"): 0.0, ("decline", "good"): 24.0},
+)
+
+def test_threshold_follows_cost_ratio():
+    # 120 : 24 -> approve only above 120/(120+24) = 0.833 of being good
+    assert BINARY.thresholds()["approve"] == pytest.approx(0.8333, abs=1e-3)
+
+def test_expected_cost_matches_hand_calculation():
+    actions = ["approve", "decline"]
+    y = [0, 1]                                    # outcomes are sorted: 0 = bad, 1 = good
+    # approve on a bad case costs 120, decline on a good case costs 24
+    assert expected_cost(SPEC, actions, y) == pytest.approx(72.0)
+
+def test_policy_is_monotone_in_score():
+    pol = RulePolicy(SPEC, threshold=0.5)
+    actions = [pol.act(s) for s in np.linspace(0, 1, 101)]
+    rank = {"decline": 0, "review": 1, "approve": 2}
+    assert all(rank[actions[i]] &lt;= rank[actions[i+1]] for i in range(len(actions)-1))
+
+def test_temperature_recovery():
+    rng = np.random.default_rng(0)
+    y = rng.integers(0, 2, 5000)
+    p = 1 / (1 + np.exp(-(2.2 * (y - 0.5) * 2 + rng.normal(0, 1, 5000))))   # known sharpness
+    cal = TemperatureCalibrator().fit(p, y)
+    assert 0.2 &lt; cal.temperature &lt; 5.0
+
+def test_missing_cost_cell_raises():
+    with pytest.raises(ValueError):
+        DecisionSpec(actions=["a","b"], costs={("a","x"):1.0}, abstain="a").validate()</code></pre>
+
+<h2>Testing the model without asserting its output</h2>
+<p>Three assertion styles that survive retraining, quantisation and prompt edits:</p>
+<pre><code>def test_model_beats_trivial_baseline(model, X_val, y_val):
+    acc = (model.predict(X_val) == y_val).mean()
+    majority = np.bincount(y_val).max() / len(y_val)
+    assert acc &gt;= majority + 0.10        # not a fixed number
+
+def test_model_abstains_on_garbage(model, spec):
+    garbage = ["", "asdf qwer", "🙂" * 40, "SELECT * FROM users;"]
+    for g in garbage:
+        assert model.decide(g).action == spec.abstain
+
+def test_model_is_calibrated(model, X_val, y_val):
+    p = model.predict_proba(X_val)[:, 1]
+    assert ece(p, y_val, n_bins=10) &lt; 0.08</code></pre>
+
+<div class="callout warn"><b>Do not assert exact strings</b>
+<code>assert out == '{"action":"review"}'</code> fails on the next tokeniser update, whitespace change or quantisation.
+Assert the parsed decision, the confidence band, and the schema — the properties you actually depend on.</div>
+
+<h2>Fixtures and speed</h2>
+<pre><code># conftest.py
+import pytest, numpy as np
+
+@pytest.fixture(scope="session")
+def spec():
+    return DecisionSpec(...)                      # built once
+
+@pytest.fixture(scope="session")
+def toy_scores():
+    rng = np.random.default_rng(42)
+    p = rng.beta(2, 5, 4000)
+    y = (rng.random(4000) &lt; p).astype(int)
+    return p, y
+
+@pytest.fixture(scope="session")
+def slm():
+    pytest.importorskip("torch")                  # skip cleanly when torch absent
+    from slm_decision import SLMDecisionModel
+    return SLMDecisionModel.from_pretrained("HuggingFaceTB/SmolLM2-135M-Instruct")</code></pre>
+<p>Target: the whole non-model suite under 5 seconds, so it runs on every save. Mark the model tests
+<code>@pytest.mark.slow</code> and run them in CI only.</p>
+
+<h2>Coverage targets</h2>
+<table>
+<thead><tr><th>Layer</th><th>Line coverage target</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>Spec + metrics + calibration</td><td>≥ 95%</td><td>Pure arithmetic; every branch is cheap to test</td></tr>
+<tr><td>Policies</td><td>≥ 90%</td><td>Branching on thresholds and caps</td></tr>
+<tr><td>Model wrappers</td><td>≥ 60%</td><td>Most lines are I/O and framework calls</td></tr>
+<tr><td>Notebooks</td><td>execute without error</td><td>Run headless in CI, no coverage requirement</td></tr>
+</tbody>
+</table>
+
+<pre><code>pytest tests/ -q --cov=slm_decision --cov-report=term-missing -m "not slow"</code></pre>
+
+  <div class="pager"><a class="prev" href="../use-cases/autonomous.html"><span class="dir">Previous</span>Autonomous systems</a><a class="next" href="../testing/integration-testing.html"><span class="dir">Next</span>Integration testing</a></div>
+  <footer class="site"><span>SLM Decision Models</span><span><a href="https://github.com/vkdev01/slm-decision-models">GitHub</a></span><span>MIT License</span></footer>
+</div>
+</main>
+</div>
+<script src="../assets/script.js"></script>
+</body>
+</html>

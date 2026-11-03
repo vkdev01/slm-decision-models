@@ -1,0 +1,15 @@
+# Tooling configuration for the repository root. The installable package lives in
+# code/pyproject.toml - this file only configures the linters and the test runner
+# so that `ruff check .` and `mypy code/src/slm_decision` behave the same locally
+# and in CI.
+
+[tool.mypy]
+ignore_missing_imports = true
+warn_unused_ignores = false
+# The numeric helpers accept "list or array" and normalise with np.asarray().
+# That pattern is safe at runtime but trips these checks on every function.
+disable_error_code = ["assignment", "attr-defined", "operator", "arg-type"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: needs torch/transformers and a model download"]

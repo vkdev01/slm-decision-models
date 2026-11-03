@@ -1,0 +1,14 @@
+# core: everything needed for specs, policies, metrics, calibration and the test suite
+numpy>=1.24
+pandas>=2.0
+
+# notebooks: optional, only needed to run notebooks/*.ipynb interactively
+# jupyterlab>=4.0
+# matplotlib>=3.7
+
+# model wrappers: optional, imported lazily by slm_decision.models
+#   pip install -e "code/[ml]"
+# torch>=2.0
+# transformers>=4.40
+# datasets>=2.12
+# scikit-learn>=1.2

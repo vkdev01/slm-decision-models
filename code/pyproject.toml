@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slm-decision"
+version = "0.1.0"
+description = "Build, evaluate and ship small language models as decision models"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "vkdev01" }]
+keywords = ["slm", "decision", "calibration", "distillation", "llm"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = ["numpy>=1.24", "pandas>=2.0"]
+
+[project.optional-dependencies]
+ml = ["torch>=2.0", "transformers>=4.40", "datasets>=2.12", "scikit-learn>=1.2"]
+serve = ["fastapi>=0.110", "uvicorn>=0.29"]
+onnx = ["onnx>=1.14", "onnxruntime>=1.15", "optimum[onnxruntime]>=1.17"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.4", "mypy>=1.8", "nbconvert>=7.0", "jupyter"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+markers = ["slow: needs torch/transformers and a model download"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+ignore = ["B905"]                 # zip(strict=) is py3.10+, keep the examples simple
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]              # assert False is fine in a test
+
+[tool.mypy]
+ignore_missing_imports = true
+warn_unused_ignores = false
+# The numeric helpers accept "list or array" and normalise with np.asarray().
+# That pattern is safe at runtime but trips these checks on every function, so
+# they are disabled rather than papered over with per-line ignores.
+disable_error_code = ["assignment", "attr-defined", "operator", "arg-type"]
